@@ -1075,6 +1075,11 @@ body.music-wall-page .article-footer {
   transition: width 180ms ease, border-radius 180ms ease, background 180ms ease, box-shadow 180ms ease;
 }
 
+.music-wall-floating-player[hidden],
+.mw-float-lyrics[hidden] {
+  display: none !important;
+}
+
 .music-wall-floating-player,
 .music-wall-floating-player * {
   box-sizing: border-box;

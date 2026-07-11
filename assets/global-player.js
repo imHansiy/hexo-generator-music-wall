@@ -10,10 +10,12 @@
   const STORAGE_LYRICS = "music-clone:lyrics";
   const SYNTH_DURATION = 96;
   const CONFIG = window.__HEXO_MUSIC_WALL_GLOBAL_CONFIG__ || {};
+  const MUSIC_PATH = normalizePath(CONFIG.musicPath || "/music/");
+  const sharedAudio = window.__HEXO_MUSIC_WALL_SHARED_AUDIO__;
 
   const state = {
-    audio: new Audio(),
-    audioUrl: "",
+    audio: sharedAudio instanceof HTMLMediaElement ? sharedAudio : new Audio(),
+    audioUrl: sharedAudio instanceof HTMLMediaElement ? (sharedAudio.currentSrc || sharedAudio.src || "") : "",
     data: readJson(STORAGE_NOW_PLAYING, null),
     queue: normalizeStoredQueue(readJson(STORAGE_QUEUE, [])),
     collapsed: localStorage.getItem(STORAGE_COLLAPSED) === "1",
@@ -54,23 +56,57 @@
     },
   };
 
-  if (document.querySelector(".music-wall-embed") || !state.data) return;
+  installPersistentNavigation();
 
-  alignCurrentWithQueue();
-  state.audio.preload = "metadata";
-  state.audio.volume = clamp(Number(localStorage.getItem("music-clone:volume") || 0.82), 0, 1);
-  state.audio.loop = state.loop;
-  createPlayer();
-  applySavedPosition();
-  bindAudioEvents();
-  syncAudioSource(false);
-  state.status = state.data.isPlaying ? "点击播放以继续" : "";
-  state.data.isPlaying = false;
-  syncView();
-  requestAnimationFrame(tick);
-  hydrateQueue();
-  loadLyrics();
-  window.addEventListener("resize", clampPlayerPosition);
+  if (document.querySelector(".music-wall-embed")) {
+    window.addEventListener("hexo-music-wall:navigated", (event) => {
+      if (!event.detail?.isMusicPage) bootGlobalPlayer();
+    });
+  } else {
+    bootGlobalPlayer();
+  }
+
+  function bootGlobalPlayer() {
+    if (state.root?.isConnected) {
+      state.root.hidden = false;
+      if (state.lyricsRoot) state.lyricsRoot.hidden = false;
+      return;
+    }
+    state.data = readJson(STORAGE_NOW_PLAYING, null);
+    if (!state.data) return;
+    state.queue = normalizeStoredQueue(readJson(STORAGE_QUEUE, []));
+    const adoptedAudio = window.__HEXO_MUSIC_WALL_SHARED_AUDIO__;
+    if (adoptedAudio instanceof HTMLMediaElement) {
+      state.audio = adoptedAudio;
+      state.audioUrl = adoptedAudio.currentSrc || adoptedAudio.src || "";
+      state.playing = !adoptedAudio.paused && !adoptedAudio.ended;
+      state.mode = state.audioUrl ? "media" : "idle";
+      if (state.playing) state.data.isPlaying = true;
+      if (Number.isFinite(adoptedAudio.currentTime)) state.data.currentTime = adoptedAudio.currentTime;
+    }
+
+    alignCurrentWithQueue();
+    state.audio.preload = "metadata";
+    state.audio.volume = clamp(Number(localStorage.getItem("music-clone:volume") || 0.82), 0, 1);
+    state.audio.loop = state.loop;
+    createPlayer();
+    applySavedPosition();
+    bindAudioEvents();
+    if (!state.audioUrl) syncAudioSource(false);
+    state.status = state.playing ? "" : (state.data.isPlaying ? "点击播放以继续" : "");
+    if (!state.playing) state.data.isPlaying = false;
+    syncView();
+    requestAnimationFrame(tick);
+    hydrateQueue();
+    loadLyrics();
+    window.addEventListener("resize", clampPlayerPosition);
+  }
+
+  window.addEventListener("hexo-music-wall:navigated", (event) => {
+    const isMusicPage = Boolean(event.detail?.isMusicPage);
+    if (state.root) state.root.hidden = isMusicPage;
+    if (state.lyricsRoot) state.lyricsRoot.hidden = isMusicPage;
+  });
 
   window.addEventListener("beforeunload", () => {
     state.data.currentTime = currentPlaybackTime();
@@ -111,6 +147,83 @@
     loadLyrics();
     syncView();
   });
+
+  function installPersistentNavigation() {
+    if (window.__HEXO_MUSIC_WALL_NAVIGATION__) return;
+    window.__HEXO_MUSIC_WALL_NAVIGATION__ = true;
+    const pageCache = new Map();
+    let navigating = false;
+
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest("a[href]");
+      if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (link.target && link.target !== "_self") return;
+      if (link.hasAttribute("download") || link.getAttribute("rel")?.split(/\s+/).includes("external")) return;
+      const url = new URL(link.href, location.href);
+      if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return;
+      if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+      event.preventDefault();
+      navigate(url, true);
+    });
+
+    window.addEventListener("popstate", () => navigate(new URL(location.href), false));
+
+    async function navigate(url, push) {
+      if (navigating) return;
+      const currentMain = document.querySelector("#main");
+      const currentShell = currentMain?.parentElement;
+      if (!currentShell) {
+        location.href = url.href;
+        return;
+      }
+      navigating = true;
+      document.documentElement.classList.add("music-wall-navigating");
+      window.dispatchEvent(new CustomEvent("hexo-music-wall:navigate-before", { detail: { url: url.href } }));
+      try {
+        const currentKey = pageKey(location.href);
+        if (normalizePath(location.pathname) === MUSIC_PATH && !pageCache.has(currentKey)) pageCache.set(currentKey, currentShell);
+
+        let nextShell = pageCache.get(pageKey(url.href));
+        let nextTitle = "";
+        let nextBodyClass = "";
+        if (!nextShell) {
+          const response = await fetch(url.href, { credentials: "same-origin", headers: { "X-Requested-With": "HexoMusicWall" } });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const nextDocument = new DOMParser().parseFromString(await response.text(), "text/html");
+          nextShell = nextDocument.querySelector("#main")?.parentElement;
+          if (!nextShell) throw new Error("目标页缺少 #main 容器");
+          nextShell = document.importNode(nextShell, true);
+          nextTitle = nextDocument.title;
+          nextBodyClass = nextDocument.body.className;
+        }
+
+        currentShell.replaceWith(nextShell);
+        if (nextTitle) document.title = nextTitle;
+        if (nextBodyClass || document.body.className) document.body.className = nextBodyClass;
+        if (push) history.pushState({ musicWallNavigation: true }, "", url.href);
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        const isMusicPage = normalizePath(url.pathname) === MUSIC_PATH;
+        document.body.classList.toggle("music-wall-page", isMusicPage);
+        window.dispatchEvent(new CustomEvent("hexo-music-wall:navigated", { detail: { url: url.href, isMusicPage } }));
+      } catch (error) {
+        console.warn("[hexo-music-wall] 无缝导航失败，已回退到普通跳转。", error);
+        location.href = url.href;
+      } finally {
+        navigating = false;
+        document.documentElement.classList.remove("music-wall-navigating");
+      }
+    }
+  }
+
+  function pageKey(value) {
+    const url = new URL(value, location.href);
+    return `${normalizePath(url.pathname)}${url.search}`;
+  }
+
+  function normalizePath(value) {
+    const path = new URL(String(value || "/"), location.origin).pathname.replace(/\/{2,}/g, "/");
+    return path === "/" ? "/" : `${path.replace(/\/+$/, "")}/`;
+  }
 
   function createPlayer() {
     const root = document.createElement("aside");

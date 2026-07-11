@@ -216,6 +216,8 @@
 
   refs.volume.value = String(state.volume);
   audio.localEl.volume = state.volume;
+  window.__HEXO_MUSIC_WALL_SHARED_AUDIO__ = audio.localEl;
+  window.addEventListener("hexo-music-wall:navigate-before", () => persistNowPlaying(true));
 
   document.addEventListener("DOMContentLoaded", boot);
 
