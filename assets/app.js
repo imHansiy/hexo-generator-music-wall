@@ -24,7 +24,7 @@
   const MAX_RENDERED_CARDS_MOBILE = 30;
   const PLAYBACK_UI_INTERVAL = 180;
   const VISUALIZER_INTERVAL = 33;
-  const REMOTE_START_TIMEOUT = 15000;
+  const REMOTE_START_TIMEOUT = 30000;
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -583,7 +583,7 @@
     audio.localEl.addEventListener("error", () => {
       if (isCurrentMedia() && !audio.pauseRequested) {
         const track = findTrack(state.currentTrackId);
-        if (track?.audio && !track.local) fallbackRemoteToSynth(track);
+        if (track?.audio && !track.local) failRemotePlayback(track);
         else {
           state.isPlaying = false;
           toast("音频无法播放，已保留视觉播放能力");
@@ -1431,7 +1431,7 @@
       await audio.localEl.play();
       if (requestId !== state.playRequestId || audio.pauseRequested) audio.localEl.pause();
     } catch (_) {
-      if (requestId === state.playRequestId && !audio.pauseRequested) fallbackRemoteToSynth(track);
+      if (requestId === state.playRequestId && !audio.pauseRequested) failRemotePlayback(track);
     }
   }
 
@@ -1444,7 +1444,7 @@
   function resumeLocal(track) {
     audio.pauseRequested = false;
     audio.localEl.play().catch(() => {
-      if (track?.audio && !track.local) fallbackRemoteToSynth(track);
+      if (track?.audio && !track.local) failRemotePlayback(track);
       else {
         state.isPlaying = false;
         toast("音频播放失败");
@@ -1470,7 +1470,7 @@
         && state.isPlaying
         && audio.localEl.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
         && (audio.localEl.currentTime || 0) < 0.05;
-      if (stalled) fallbackRemoteToSynth(track, "云音频连接超时，已切换内置音色播放");
+      if (stalled) failRemotePlayback(track, "云音频连接超时，请点击播放重试");
     }, REMOTE_START_TIMEOUT);
   }
 
@@ -1480,25 +1480,20 @@
     audio.remoteWatchdog = 0;
   }
 
-  function fallbackRemoteToSynth(track, message = "云歌单音频接口暂不可用，已切换为内置音色播放") {
+  function failRemotePlayback(track, message = "云音频播放失败，请点击播放重试") {
     if (!track || track.local) return;
     clearRemoteWatchdog();
-    track.remoteAudioFailed = true;
-    audio.localTrackId = "";
+    state.currentTime = audio.localEl.currentTime || state.currentTime || 0;
+    state.duration = mediaDuration(track);
+    audio.pauseRequested = true;
     audio.localEl.pause();
-    audio.localEl.removeAttribute("src");
-    audio.localEl.load();
-    state.currentTrackId = track.id;
-    state.currentTime = 0;
-    state.duration = SYNTH_DURATION;
-    state.isPlaying = true;
-    audio.pauseRequested = false;
+    state.isPlaying = false;
     audio.switching = false;
-    startPlaybackClock(0);
-    playSynth(track);
-    refs.status.textContent = `正在播放：${track.title}`;
+    stopPlaybackClock(state.currentTime);
+    refs.status.textContent = message;
     toast(message);
     updatePlaybackViews();
+    persistNowPlaying(true);
   }
 
   function isCurrentMedia() {

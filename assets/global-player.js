@@ -361,7 +361,7 @@
 
     state.audio.addEventListener("error", () => {
       if (!state.loading && state.mode !== "media") return;
-      fallbackToSynth("云音频不可用，已切换内置音色");
+      failRemotePlayback("云音频播放失败，请点击播放重试");
     });
   }
 
@@ -465,7 +465,7 @@
       if (requestId !== state.requestId) state.audio.pause();
     } catch (_) {
       if (requestId !== state.requestId) return;
-      if (allowFallback) fallbackToSynth("云音频不可用，已切换内置音色");
+      if (allowFallback) failRemotePlayback("云音频播放失败，请点击播放重试");
       else {
         state.loading = false;
         state.playing = false;
@@ -638,8 +638,8 @@
         && state.playing
         && state.audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
         && (state.audio.currentTime || 0) <= initialTime + 0.05;
-      if (stalled) fallbackToSynth("云音频连接超时，已切换内置音色");
-    }, 15000);
+      if (stalled) failRemotePlayback("云音频连接超时，请点击播放重试");
+    }, 30000);
   }
 
   function clearWatchdog() {
@@ -648,13 +648,18 @@
     state.watchdog = 0;
   }
 
-  function fallbackToSynth(message) {
+  function failRemotePlayback(message) {
     clearWatchdog();
     state.switching = true;
     try { state.audio.pause(); } catch (_) {}
     state.switching = false;
+    state.loading = false;
+    state.playing = false;
+    state.data.isPlaying = false;
+    state.data.currentTime = state.audio.currentTime || state.data.currentTime || 0;
     state.status = message;
-    startSynth();
+    persist(true);
+    syncView();
   }
 
   function primeSynthContext() {
