@@ -1,4 +1,4 @@
-# hexo-music-wall
+# hexo-generator-music-wall
 
 一个 Hexo 网易云音乐墙插件。安装后会在默认路径 `/music/` 生成一个嵌入博客主题布局的音乐页，你可以在主题导航里直接跳转到这个路径。
 
@@ -9,13 +9,13 @@
 在 Hexo 站点目录中安装：
 
 ```bash
-npm install hexo-music-wall
+npm install hexo-generator-music-wall
 ```
 
 本地开发时也可以安装本仓库：
 
 ```bash
-npm install /path/to/hexo-music-wall
+npm install /path/to/hexo-generator-music-wall
 ```
 
 ## 配置
