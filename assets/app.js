@@ -10,7 +10,7 @@
     lyrics: "music-clone:lyrics",
     drafts: "music-clone:forumDrafts",
     visual: "music-clone:visualMode",
-    desktopLyricsPosition: "music-clone:desktopLyricsPosition",
+    desktopLyricsPosition: "music-clone:desktopLyricsPosition:v2",
     nowPlaying: "music-clone:nowPlaying",
     queue: "music-clone:queue",
   };

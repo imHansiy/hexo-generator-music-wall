@@ -654,15 +654,15 @@ body.music-wall-page .article-footer {
   position: absolute;
   z-index: 21;
   left: 50%;
-  bottom: 132px;
+  bottom: 124px;
   display: flex;
-  width: min(820px, calc(100% - 48px));
-  min-height: 82px;
+  width: min(680px, calc(100% - 32px));
+  min-height: 72px;
   align-items: center;
   justify-content: center;
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 10px 48px;
+  padding: 8px 42px;
   color: #fff;
   text-align: center;
   cursor: grab;
@@ -2236,8 +2236,8 @@ body.music-wall-page .article-footer {
 
 @media (max-width: 760px) {
   .desktop-lyrics {
-    bottom: 136px;
-    width: calc(100% - 20px);
+    bottom: 132px;
+    width: calc(100% - 22px);
     min-height: 66px;
     padding: 8px 34px;
   }
