@@ -24,7 +24,7 @@
   const MAX_RENDERED_CARDS_MOBILE = 30;
   const PLAYBACK_UI_INTERVAL = 180;
   const VISUALIZER_INTERVAL = 33;
-  const REMOTE_START_TIMEOUT = 2600;
+  const REMOTE_START_TIMEOUT = 15000;
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -559,6 +559,8 @@
         updatePlaybackViews();
       }
     });
+    audio.localEl.addEventListener("canplay", clearRemoteWatchdog);
+    audio.localEl.addEventListener("playing", clearRemoteWatchdog);
     audio.localEl.addEventListener("play", () => {
       if (!isCurrentMedia()) return;
       if (audio.pauseRequested) {
@@ -1466,8 +1468,9 @@
       const stalled = audio.localTrackId === track.id
         && state.currentTrackId === track.id
         && state.isPlaying
+        && audio.localEl.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
         && (audio.localEl.currentTime || 0) < 0.05;
-      if (stalled) fallbackRemoteToSynth(track, "云音频加载较慢，已切换内置音色播放");
+      if (stalled) fallbackRemoteToSynth(track, "云音频连接超时，已切换内置音色播放");
     }, REMOTE_START_TIMEOUT);
   }
 

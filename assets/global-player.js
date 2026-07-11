@@ -322,6 +322,8 @@
       restoreMediaTime();
       syncView();
     });
+    state.audio.addEventListener("canplay", clearWatchdog);
+    state.audio.addEventListener("playing", clearWatchdog);
 
     state.audio.addEventListener("play", () => {
       if (state.switching) return;
@@ -632,9 +634,12 @@
     clearWatchdog();
     const initialTime = state.audio.currentTime || 0;
     state.watchdog = window.setTimeout(() => {
-      const stalled = state.mode === "media" && state.playing && (state.audio.currentTime || 0) <= initialTime + 0.05;
-      if (stalled) fallbackToSynth("云音频加载较慢，已切换内置音色");
-    }, 2800);
+      const stalled = state.mode === "media"
+        && state.playing
+        && state.audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+        && (state.audio.currentTime || 0) <= initialTime + 0.05;
+      if (stalled) fallbackToSynth("云音频连接超时，已切换内置音色");
+    }, 15000);
   }
 
   function clearWatchdog() {
