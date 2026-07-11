@@ -24,7 +24,6 @@
   const MAX_RENDERED_CARDS_MOBILE = 30;
   const PLAYBACK_UI_INTERVAL = 180;
   const VISUALIZER_INTERVAL = 33;
-  const REMOTE_START_TIMEOUT = 30000;
 
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
@@ -209,12 +208,12 @@
     localEl: new Audio(),
     localUrl: "",
     localTrackId: "",
-    remoteWatchdog: 0,
     pauseRequested: false,
     switching: false,
   };
 
   refs.volume.value = String(state.volume);
+  audio.localEl.preload = "auto";
   audio.localEl.volume = state.volume;
   window.__HEXO_MUSIC_WALL_SHARED_AUDIO__ = audio.localEl;
   window.addEventListener("hexo-music-wall:navigate-before", () => persistNowPlaying(true));
@@ -549,7 +548,6 @@
       if (isCurrentMedia()) {
         state.currentTime = audio.localEl.currentTime || 0;
         state.duration = mediaDuration(findTrack(state.currentTrackId));
-        if (state.currentTime > 0.05) clearRemoteWatchdog();
         updatePlaybackViews();
       }
     });
@@ -559,8 +557,11 @@
         updatePlaybackViews();
       }
     });
-    audio.localEl.addEventListener("canplay", clearRemoteWatchdog);
-    audio.localEl.addEventListener("playing", clearRemoteWatchdog);
+    audio.localEl.addEventListener("loadstart", showRemoteBuffering);
+    audio.localEl.addEventListener("waiting", showRemoteBuffering);
+    audio.localEl.addEventListener("stalled", showRemoteBuffering);
+    audio.localEl.addEventListener("canplay", showRemoteReady);
+    audio.localEl.addEventListener("playing", showRemoteReady);
     audio.localEl.addEventListener("play", () => {
       if (!isCurrentMedia()) return;
       if (audio.pauseRequested) {
@@ -1258,7 +1259,6 @@
     const requestId = ++state.playRequestId;
     audio.switching = true;
     audio.pauseRequested = false;
-    clearRemoteWatchdog();
     stopSynth();
     pauseLocal(false);
     state.currentTrackId = track.id;
@@ -1427,7 +1427,7 @@
       audio.localEl.src = track.audio;
       audio.localEl.currentTime = 0;
       audio.localEl.volume = state.volume;
-      watchRemoteStart(track);
+      refs.status.textContent = `正在缓存：${track.title}`;
       await audio.localEl.play();
       if (requestId !== state.playRequestId || audio.pauseRequested) audio.localEl.pause();
     } catch (_) {
@@ -1436,7 +1436,7 @@
   }
 
   function pauseLocal(update = true) {
-    clearRemoteWatchdog();
+    refs.miniPlayer?.classList.remove("is-buffering");
     audio.localEl.pause();
     if (update && isCurrentMedia()) state.currentTime = audio.localEl.currentTime || 0;
   }
@@ -1462,27 +1462,25 @@
     return elementDuration || track?.duration || SYNTH_DURATION;
   }
 
-  function watchRemoteStart(track) {
-    clearRemoteWatchdog();
-    audio.remoteWatchdog = window.setTimeout(() => {
-      const stalled = audio.localTrackId === track.id
-        && state.currentTrackId === track.id
-        && state.isPlaying
-        && audio.localEl.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
-        && (audio.localEl.currentTime || 0) < 0.05;
-      if (stalled) failRemotePlayback(track, "云音频连接超时，请点击播放重试");
-    }, REMOTE_START_TIMEOUT);
+  function showRemoteBuffering() {
+    if (!isCurrentMedia() || audio.pauseRequested) return;
+    const track = findTrack(state.currentTrackId);
+    refs.miniPlayer?.classList.add("is-buffering");
+    refs.status.textContent = `正在缓存：${track?.title || "云音乐"}`;
+    updatePlaybackViews();
   }
 
-  function clearRemoteWatchdog() {
-    if (!audio.remoteWatchdog) return;
-    window.clearTimeout(audio.remoteWatchdog);
-    audio.remoteWatchdog = 0;
+  function showRemoteReady() {
+    if (!isCurrentMedia() || audio.pauseRequested) return;
+    const track = findTrack(state.currentTrackId);
+    refs.miniPlayer?.classList.remove("is-buffering");
+    refs.status.textContent = `正在播放：${track?.title || "云音乐"}`;
+    updatePlaybackViews();
   }
 
   function failRemotePlayback(track, message = "云音频播放失败，请点击播放重试") {
     if (!track || track.local) return;
-    clearRemoteWatchdog();
+    refs.miniPlayer?.classList.remove("is-buffering");
     state.currentTime = audio.localEl.currentTime || state.currentTime || 0;
     state.duration = mediaDuration(track);
     audio.pauseRequested = true;

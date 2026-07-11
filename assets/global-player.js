@@ -30,7 +30,6 @@
     switching: false,
     seeking: false,
     requestId: 0,
-    watchdog: 0,
     status: "",
     lastPersistAt: 0,
     root: null,
@@ -86,7 +85,7 @@
     }
 
     alignCurrentWithQueue();
-    state.audio.preload = "metadata";
+    state.audio.preload = "auto";
     state.audio.volume = clamp(Number(localStorage.getItem("music-clone:volume") || 0.82), 0, 1);
     state.audio.loop = state.loop;
     createPlayer();
@@ -322,8 +321,11 @@
       restoreMediaTime();
       syncView();
     });
-    state.audio.addEventListener("canplay", clearWatchdog);
-    state.audio.addEventListener("playing", clearWatchdog);
+    state.audio.addEventListener("loadstart", showMediaBuffering);
+    state.audio.addEventListener("waiting", showMediaBuffering);
+    state.audio.addEventListener("stalled", showMediaBuffering);
+    state.audio.addEventListener("canplay", showMediaReady);
+    state.audio.addEventListener("playing", showMediaReady);
 
     state.audio.addEventListener("play", () => {
       if (state.switching) return;
@@ -332,7 +334,6 @@
       state.playing = true;
       state.data.isPlaying = true;
       state.status = "";
-      startMediaWatchdog();
       persist(true);
       syncView();
     });
@@ -343,14 +344,12 @@
       state.playing = false;
       state.loading = false;
       state.data.isPlaying = false;
-      clearWatchdog();
       persist(true);
       syncView();
     });
 
     state.audio.addEventListener("ended", () => {
       if (state.switching || state.mode !== "media") return;
-      clearWatchdog();
       if (state.loop) {
         seekTo(0);
         startPlayback(true);
@@ -478,7 +477,6 @@
 
   function pausePlayback() {
     ++state.requestId;
-    clearWatchdog();
     const current = currentPlaybackTime();
     if (state.mode === "media") state.audio.pause();
     if (state.mode === "synth") stopSynth(true);
@@ -494,7 +492,6 @@
   function stopPlayback() {
     state.switching = true;
     ++state.requestId;
-    clearWatchdog();
     try { state.audio.pause(); } catch (_) {}
     stopSynth(false);
     state.playing = false;
@@ -630,26 +627,21 @@
     } catch (_) {}
   }
 
-  function startMediaWatchdog() {
-    clearWatchdog();
-    const initialTime = state.audio.currentTime || 0;
-    state.watchdog = window.setTimeout(() => {
-      const stalled = state.mode === "media"
-        && state.playing
-        && state.audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
-        && (state.audio.currentTime || 0) <= initialTime + 0.05;
-      if (stalled) failRemotePlayback("云音频连接超时，请点击播放重试");
-    }, 30000);
+  function showMediaBuffering() {
+    if (state.mode !== "media" || !state.data?.audio) return;
+    state.loading = true;
+    state.status = "正在缓存音频...";
+    syncView();
   }
 
-  function clearWatchdog() {
-    if (!state.watchdog) return;
-    window.clearTimeout(state.watchdog);
-    state.watchdog = 0;
+  function showMediaReady() {
+    if (state.mode !== "media") return;
+    state.loading = false;
+    state.status = "";
+    syncView();
   }
 
   function failRemotePlayback(message) {
-    clearWatchdog();
     state.switching = true;
     try { state.audio.pause(); } catch (_) {}
     state.switching = false;

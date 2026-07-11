@@ -803,6 +803,32 @@ body.music-wall-page .article-footer {
   z-index: 70;
 }
 
+.mini-player.is-buffering::before {
+  content: "正在缓存音频…";
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(9, 19, 37, 0.58);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transform: translateX(-50%);
+  animation: buffering-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes buffering-pulse {
+  0%, 100% { opacity: 0.62; }
+  50% { opacity: 1; }
+}
+
 .mini-player .icon-button,
 .mini-player .play-button {
   position: relative;
