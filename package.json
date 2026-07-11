@@ -1,0 +1,30 @@
+{
+  "name": "hexo-music-wall",
+  "version": "0.1.0",
+  "description": "Hexo 网易云音乐墙插件，生成沉浸式 3D 歌单页面。",
+  "main": "index.js",
+  "keywords": [
+    "hexo",
+    "hexo-plugin",
+    "music",
+    "netease",
+    "music-wall"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/imHansiy/hexo-music-wall.git"
+  },
+  "homepage": "https://github.com/imHansiy/hexo-music-wall#readme",
+  "bugs": {
+    "url": "https://github.com/imHansiy/hexo-music-wall/issues"
+  },
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "assets",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "hexo": ">=6"
+  }
+}
