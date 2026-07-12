@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const PLUGIN_ROOT = __dirname;
 const ASSET_DIR = path.join(PLUGIN_ROOT, "assets");
@@ -147,9 +148,9 @@ function joinUrl(root, route) {
 
 function getAssetVersion() {
   const files = ["styles.css", "app.js", "global-player.js", "night-alley.jpg"].map((file) => path.join(ASSET_DIR, file));
-  return files
-    .map((file) => Math.round(fs.statSync(file).mtimeMs))
-    .join(".");
+  const hash = crypto.createHash("sha256");
+  for (const file of files) hash.update(fs.readFileSync(file));
+  return hash.digest("hex").slice(0, 16);
 }
 
 function renderComponent(config, assetBase, assetVersion) {
