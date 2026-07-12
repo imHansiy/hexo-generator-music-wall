@@ -208,6 +208,9 @@
     localEl: new Audio(),
     localUrl: "",
     localTrackId: "",
+    remoteController: null,
+    remoteMediaSource: null,
+    remoteObjectUrl: "",
     pauseRequested: false,
     switching: false,
   };
@@ -1259,6 +1262,7 @@
     const requestId = ++state.playRequestId;
     audio.switching = true;
     audio.pauseRequested = false;
+    stopRemoteStream();
     stopSynth();
     pauseLocal(false);
     state.currentTrackId = track.id;
@@ -1417,6 +1421,15 @@
   }
 
   async function playRemote(track, requestId) {
+    if (supportsRemoteStreaming()) {
+      try {
+        await playRemoteStream(track, requestId);
+        return;
+      } catch (_) {
+        if (requestId !== state.playRequestId || audio.pauseRequested) return;
+        stopRemoteStream();
+      }
+    }
     try {
       if (audio.localUrl) {
         URL.revokeObjectURL(audio.localUrl);
@@ -1433,6 +1446,102 @@
     } catch (_) {
       if (requestId === state.playRequestId && !audio.pauseRequested) failRemotePlayback(track);
     }
+  }
+
+  function supportsRemoteStreaming() {
+    return typeof MediaSource !== "undefined"
+      && typeof ReadableStream !== "undefined"
+      && MediaSource.isTypeSupported("audio/mpeg");
+  }
+
+  async function playRemoteStream(track, requestId) {
+    const mediaSource = new MediaSource();
+    const controller = new AbortController();
+    const objectUrl = URL.createObjectURL(mediaSource);
+    audio.remoteController = controller;
+    audio.remoteMediaSource = mediaSource;
+    audio.remoteObjectUrl = objectUrl;
+    audio.localTrackId = track.id;
+    audio.localEl.src = objectUrl;
+    audio.localEl.currentTime = 0;
+    audio.localEl.volume = state.volume;
+    refs.status.textContent = `正在缓存：${track.title}`;
+
+    const sourceOpen = waitForMediaSourceOpen(mediaSource, controller.signal);
+    const playPromise = audio.localEl.play().then(() => null, (error) => error);
+    const response = await fetch(track.audio, {
+      mode: "cors",
+      credentials: "omit",
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+    await sourceOpen;
+    if (requestId !== state.playRequestId || controller.signal.aborted) return;
+
+    const mime = normalizeStreamMime(response.headers.get("content-type"));
+    const sourceBuffer = mediaSource.addSourceBuffer(mime);
+    const reader = response.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (requestId !== state.playRequestId || controller.signal.aborted) {
+        await reader.cancel();
+        return;
+      }
+      if (value?.byteLength) await appendStreamChunk(sourceBuffer, value, controller.signal);
+    }
+    if (mediaSource.readyState === "open" && !sourceBuffer.updating) mediaSource.endOfStream();
+    const playError = await playPromise;
+    if (playError) throw playError;
+  }
+
+  function waitForMediaSourceOpen(mediaSource, signal) {
+    if (mediaSource.readyState === "open") return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        mediaSource.removeEventListener("sourceopen", onOpen);
+        signal.removeEventListener("abort", onAbort);
+      };
+      const onOpen = () => { cleanup(); resolve(); };
+      const onAbort = () => { cleanup(); reject(new DOMException("Aborted", "AbortError")); };
+      mediaSource.addEventListener("sourceopen", onOpen, { once: true });
+      signal.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+
+  function appendStreamChunk(sourceBuffer, chunk, signal) {
+    return new Promise((resolve, reject) => {
+      const cleanup = () => {
+        sourceBuffer.removeEventListener("updateend", onDone);
+        sourceBuffer.removeEventListener("error", onError);
+        signal.removeEventListener("abort", onAbort);
+      };
+      const onDone = () => { cleanup(); resolve(); };
+      const onError = () => { cleanup(); reject(new Error("音频流解析失败")); };
+      const onAbort = () => { cleanup(); reject(new DOMException("Aborted", "AbortError")); };
+      sourceBuffer.addEventListener("updateend", onDone, { once: true });
+      sourceBuffer.addEventListener("error", onError, { once: true });
+      signal.addEventListener("abort", onAbort, { once: true });
+      try {
+        sourceBuffer.appendBuffer(chunk);
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    });
+  }
+
+  function normalizeStreamMime(contentType) {
+    const type = String(contentType || "").split(";")[0].trim().toLowerCase();
+    return MediaSource.isTypeSupported(type) ? type : "audio/mpeg";
+  }
+
+  function stopRemoteStream() {
+    if (audio.remoteController) audio.remoteController.abort();
+    audio.remoteController = null;
+    audio.remoteMediaSource = null;
+    if (audio.remoteObjectUrl) URL.revokeObjectURL(audio.remoteObjectUrl);
+    audio.remoteObjectUrl = "";
   }
 
   function pauseLocal(update = true) {
