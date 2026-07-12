@@ -46,8 +46,10 @@ body.music-wall-page .article-entry {
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
+  border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
+  overflow: visible !important;
 }
 
 /* Escape constrained theme columns such as Volantis .l_main without replacing its navbar. */
@@ -65,6 +67,7 @@ body.music-wall-page #post-body {
 }
 
 body.music-wall-page .l_main {
+  flex: 1 1 100% !important;
   float: none !important;
   margin: 0 !important;
 }
