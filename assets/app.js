@@ -607,7 +607,7 @@
       if (isCurrentMedia()) handleEnded();
     });
     audio.localEl.addEventListener("error", () => {
-      if (isCurrentMedia() && !audio.pauseRequested) {
+      if (isCurrentMedia() && !audio.pauseRequested && !audio.switching) {
         const track = findTrack(state.currentTrackId);
         if (track?.audio && !track.local) failRemotePlayback(track);
         else {
@@ -1445,36 +1445,35 @@
   }
 
   async function playRemote(track, requestId) {
-    if (supportsRemoteStreaming()) {
-      const candidates = remoteAudioCandidates(track);
-      for (let index = 0; index < candidates.length; index++) {
-        try {
-          await playRemoteStream(track, requestId, candidates[index]);
-          track.audio = candidates[index];
+    if (audio.localUrl) {
+      URL.revokeObjectURL(audio.localUrl);
+      audio.localUrl = "";
+    }
+    stopRemoteStream();
+    audio.localEl.removeAttribute("crossorigin");
+    audio.localTrackId = track.id;
+
+    const candidates = remoteAudioCandidates(track);
+    for (let index = 0; index < candidates.length; index++) {
+      try {
+        audio.localEl.src = candidates[index];
+        audio.localEl.currentTime = 0;
+        audio.localEl.volume = state.volume;
+        refs.status.textContent = index
+          ? `正在连接备用音源：${track.title}`
+          : `正在缓存：${track.title}`;
+        await audio.localEl.play();
+        if (requestId !== state.playRequestId || audio.pauseRequested) {
+          audio.localEl.pause();
           return;
-        } catch (_) {
-          if (requestId !== state.playRequestId || audio.pauseRequested) return;
-          stopRemoteStream();
-          if (index < candidates.length - 1) refs.status.textContent = `正在切换备用音源：${track.title}`;
         }
+        track.audio = candidates[index];
+        return;
+      } catch (_) {
+        if (requestId !== state.playRequestId || audio.pauseRequested) return;
       }
     }
-    try {
-      if (audio.localUrl) {
-        URL.revokeObjectURL(audio.localUrl);
-        audio.localUrl = "";
-      }
-      audio.localEl.removeAttribute("crossorigin");
-      audio.localTrackId = track.id;
-      audio.localEl.src = track.audio;
-      audio.localEl.currentTime = 0;
-      audio.localEl.volume = state.volume;
-      refs.status.textContent = `正在缓存：${track.title}`;
-      await audio.localEl.play();
-      if (requestId !== state.playRequestId || audio.pauseRequested) audio.localEl.pause();
-    } catch (_) {
-      if (requestId === state.playRequestId && !audio.pauseRequested) failRemotePlayback(track);
-    }
+    failRemotePlayback(track);
   }
 
   function supportsRemoteStreaming() {
