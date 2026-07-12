@@ -15,8 +15,13 @@ const DEFAULT_CONFIG = {
   playlist_id: "",
   playlist_url: "",
   meting_api: [
-    "https://api.injahow.cn/meting/",
-    "https://api.qijieya.cn/meting/"
+    "https://api.qijieya.cn/meting/",
+    "https://music.3e0.cn/",
+    "https://meting.mikus.ink/api",
+    "https://met.api.xiaoguan.fit/api",
+    "https://meting-api.saop.cc/api",
+    "https://met.liiiu.cn/api",
+    "https://api.injahow.cn/meting/"
   ],
   fallback: true,
   fallback_count: 139,

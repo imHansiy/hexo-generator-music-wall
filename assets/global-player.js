@@ -924,6 +924,8 @@
       duration: parseDuration(item?.duration || item?.interval || item?.time) || SYNTH_DURATION,
       hue: hashCode(`${title}-${artist}-${index}`) % 360,
       lyricsUrl: /^https?:\/\//i.test(lyricsUrl) ? lyricsUrl : "",
+      remoteId: String(item?.id || item?.songmid || item?.mid || extractResourceId(audio) || ""),
+      audioApiBases: Array.isArray(CONFIG.apiBases) ? CONFIG.apiBases.map(String).filter(Boolean) : [],
     };
   }
 
@@ -939,7 +941,17 @@
       duration: Number(track.duration) || SYNTH_DURATION,
       hue: Number(track.hue) || hashCode(`${track.title}-${track.artist || ""}`) % 360,
       lyricsUrl: String(track.lyricsUrl || ""),
+      remoteId: String(track.remoteId || ""),
+      audioApiBases: Array.isArray(track.audioApiBases) ? track.audioApiBases.map(String).filter(Boolean) : [],
     }));
+  }
+
+  function extractResourceId(value) {
+    try {
+      return new URL(String(value || ""), location.href).searchParams.get("id") || "";
+    } catch (_) {
+      return "";
+    }
   }
 
   function alignCurrentWithQueue() {

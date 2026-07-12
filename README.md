@@ -49,11 +49,27 @@ music_wall:
 | `subtitle` | `来自你的云歌单` | 顶部副标题 |
 | `playlist_id` | 空 | 歌单 ID |
 | `playlist_url` | 空 | 歌单链接，可代替 `playlist_id` |
-| `meting_api` | 内置两个公开接口 | Meting API 地址，可填数组或逗号分隔字符串 |
+| `meting_api` | 内置多个公开节点 | Meting API 地址，可填数组或逗号分隔字符串；按顺序自动回退 |
 | `fallback` | `true` | 歌单接口失败时是否显示占位曲目 |
 | `fallback_count` | `139` | 占位曲目数量 |
 | `enable_local_library` | `false` | 已默认关闭；当前版本面向网易云歌单展示 |
 | `quality` | `high` | 渲染质量；默认高画质，只有显式设为 `fast` / `lite` / `low` / `performance` 时才启用轻量模式 |
+
+默认的 Meting 回退顺序为：
+
+```yaml
+music_wall:
+  meting_api:
+    - https://api.qijieya.cn/meting/
+    - https://music.3e0.cn/
+    - https://meting.mikus.ink/api
+    - https://met.api.xiaoguan.fit/api
+    - https://meting-api.saop.cc/api
+    - https://met.liiiu.cn/api
+    - https://api.injahow.cn/meting/
+```
+
+插件会在歌单查询失败时切换节点；播放单曲时也会根据网易云资源 ID 重建备用音频 URL。
 
 ## 导航
 
@@ -71,3 +87,4 @@ menu:
 - 网易云音乐数据依赖浏览器端请求第三方 Meting API，接口可用性、跨域和音频授权由接口与音乐平台决定。
 - 如果歌单返回了封面但没有可播放音频，页面会展示音乐墙和封面，并在播放时提示音频暂不可用。
 - 站内无缝播放会接管普通的同源内部链接，使用 History API 更换 Hexo 主内容。外链、下载链接、新窗口链接和站内锚点保持浏览器原生行为。
+- 内置的公开 Meting 节点为第三方社区服务，不由本插件或网易云音乐运营，可用性可能随时变化。生产环境建议在 `meting_api` 最前面配置自己部署的节点。

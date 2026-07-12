@@ -92,7 +92,15 @@
     const apiBases = Array.isArray(raw.apiBases || raw.api_bases)
       ? raw.apiBases || raw.api_bases
       : String(raw.apiBase || raw.api_base || raw.metingApi || raw.meting_api || "").split(",").filter(Boolean);
-    const normalizedApiBases = (apiBases.length ? apiBases : ["https://api.injahow.cn/meting/", "https://api.qijieya.cn/meting/"]).map((item) => String(item).trim()).filter(Boolean);
+    const normalizedApiBases = (apiBases.length ? apiBases : [
+      "https://api.qijieya.cn/meting/",
+      "https://music.3e0.cn/",
+      "https://meting.mikus.ink/api",
+      "https://met.api.xiaoguan.fit/api",
+      "https://meting-api.saop.cc/api",
+      "https://met.liiiu.cn/api",
+      "https://api.injahow.cn/meting/",
+    ]).map((item) => String(item).trim()).filter(Boolean);
     const playlists = normalizePlaylistConfigs(raw);
     const primary = playlists[0] || normalizePlaylistConfig(raw, 0, "featured") || {};
     return {
@@ -371,9 +379,9 @@
   function normalizeRemoteTrack(item, index, playlist) {
     const title = firstText(item.title, item.name, item.songname, item.songName);
     const artist = firstText(item.artist, item.author, item.singer, item.artists, item.ar);
-    const audioUrl = firstText(item.audio, item.url, item.src);
+    const audioUrl = secureRemoteUrl(firstText(item.audio, item.url, item.src));
     const cover = firstText(item.cover, item.pic, item.picture, item.album?.picUrl, item.al?.picUrl);
-    const lyricSource = firstText(item.lrc, item.lyric, item.lyrics);
+    const lyricSource = secureRemoteUrl(firstText(item.lrc, item.lyric, item.lyrics));
     const parsedLyrics = parseLyricText(lyricSource);
     const duration = parseDuration(firstText(item.duration, item.interval, item.time, item.dt));
     if (!title) return null;
@@ -392,7 +400,8 @@
       duration: duration || SYNTH_DURATION,
       lyrics: parsedLyrics,
       lyricsUrl: /^https?:\/\//i.test(lyricSource) ? lyricSource : "",
-      remoteId: String(item.id || item.songmid || item.mid || ""),
+      remoteId: String(item.id || item.songmid || item.mid || extractResourceId(audioUrl) || ""),
+      audioApiBases: playlist.apiBases.length ? playlist.apiBases : CONFIG.apiBases,
       lyricsApiBases: playlist.apiBases.length ? playlist.apiBases : CONFIG.apiBases,
     };
   }
@@ -494,6 +503,19 @@
 
   function trimSlash(url) {
     return String(url).replace(/\/+$/, "/");
+  }
+
+  function secureRemoteUrl(value) {
+    const url = String(value || "").trim();
+    return url.startsWith("http://") ? `https://${url.slice(7)}` : url;
+  }
+
+  function extractResourceId(value) {
+    try {
+      return new URL(String(value || ""), location.href).searchParams.get("id") || "";
+    } catch (_) {
+      return "";
+    }
   }
 
   function buildLyrics(seed) {
@@ -656,6 +678,8 @@
       duration: track.duration || 0,
       hue: track.hue || 0,
       lyricsUrl: track.lyricsUrl || "",
+      remoteId: track.remoteId || extractResourceId(track.audio),
+      audioApiBases: track.audioApiBases || CONFIG.apiBases,
     }));
     try {
       localStorage.setItem(STORAGE.queue, JSON.stringify(queue));
@@ -1422,12 +1446,17 @@
 
   async function playRemote(track, requestId) {
     if (supportsRemoteStreaming()) {
-      try {
-        await playRemoteStream(track, requestId);
-        return;
-      } catch (_) {
-        if (requestId !== state.playRequestId || audio.pauseRequested) return;
-        stopRemoteStream();
+      const candidates = remoteAudioCandidates(track);
+      for (let index = 0; index < candidates.length; index++) {
+        try {
+          await playRemoteStream(track, requestId, candidates[index]);
+          track.audio = candidates[index];
+          return;
+        } catch (_) {
+          if (requestId !== state.playRequestId || audio.pauseRequested) return;
+          stopRemoteStream();
+          if (index < candidates.length - 1) refs.status.textContent = `正在切换备用音源：${track.title}`;
+        }
       }
     }
     try {
@@ -1454,7 +1483,18 @@
       && MediaSource.isTypeSupported("audio/mpeg");
   }
 
-  async function playRemoteStream(track, requestId) {
+  function remoteAudioCandidates(track) {
+    const id = track.remoteId || extractResourceId(track.audio);
+    const urls = [secureRemoteUrl(track.audio)];
+    if (id) {
+      for (const base of track.audioApiBases || CONFIG.apiBases) {
+        urls.push(`${trimSlash(base)}?server=netease&type=url&id=${encodeURIComponent(id)}`);
+      }
+    }
+    return [...new Set(urls.filter(Boolean))];
+  }
+
+  async function playRemoteStream(track, requestId, streamUrl) {
     const mediaSource = new MediaSource();
     const controller = new AbortController();
     const objectUrl = URL.createObjectURL(mediaSource);
@@ -1469,7 +1509,7 @@
 
     const sourceOpen = waitForMediaSourceOpen(mediaSource, controller.signal);
     const playPromise = audio.localEl.play().then(() => null, (error) => error);
-    const response = await fetch(track.audio, {
+    const response = await fetch(streamUrl, {
       mode: "cors",
       credentials: "omit",
       signal: controller.signal,
@@ -1784,6 +1824,8 @@
       audioKind: track.remoteAudioFailed || !track.audio ? "synth" : track.audioKind || "remote",
       hue: track.hue || 0,
       lyricsUrl: track.lyricsUrl || "",
+      remoteId: track.remoteId || extractResourceId(track.audio),
+      audioApiBases: track.audioApiBases || CONFIG.apiBases,
       currentTime: state.currentTime || 0,
       duration: state.duration || SYNTH_DURATION,
       isPlaying: state.isPlaying,
