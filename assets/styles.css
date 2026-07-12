@@ -50,6 +50,34 @@ body.music-wall-page .article-entry {
   box-shadow: none !important;
 }
 
+/* Escape constrained theme columns such as Volantis .l_main without replacing its navbar. */
+body.music-wall-page {
+  overflow-x: clip;
+}
+
+body.music-wall-page .l_body,
+body.music-wall-page .safearea,
+body.music-wall-page .body-wrapper,
+body.music-wall-page .l_main,
+body.music-wall-page #post-body {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+body.music-wall-page .l_main {
+  float: none !important;
+  margin: 0 !important;
+}
+
+body.music-wall-page .music-wall-embed {
+  left: 50%;
+  width: 100vw;
+  width: 100dvw;
+  max-width: none;
+  margin-left: -50vw;
+  margin-left: -50dvw;
+}
+
 body.music-wall-page .article-meta,
 body.music-wall-page .article-header,
 body.music-wall-page .article-footer {
