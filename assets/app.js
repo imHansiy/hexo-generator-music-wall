@@ -1296,6 +1296,7 @@
     state.focusActive = true;
     startPlaybackClock(0);
     pushHistory(track.id);
+    syncExpandedToTrack(track);
     if (state.lyricsEnabled) ensureTrackLyrics(track);
     focusTrackInWall(track.id);
     updateCardTransforms();
@@ -2098,6 +2099,13 @@
     updateCardTransforms();
   }
 
+  function syncExpandedToTrack(track) {
+    if (!track || !state.expandedTrackId || refs.expandedRoot.classList.contains("hidden")) return;
+    if (state.expandedTrackId === track.id) return;
+    state.expandedTrackId = track.id;
+    renderExpanded(track);
+  }
+
   function closeExpanded() {
     state.expandedTrackId = null;
     refs.miniPlayer?.classList.remove("is-modal-layer");
@@ -2173,18 +2181,8 @@
     const track = findTrack(state.expandedTrackId);
     if (!track) return;
     if (action === "toggle") playTrack(track.id, { toggle: true });
-    if (action === "prev") {
-      playFromTrack(track.id, -1);
-      const previous = findTrack(state.currentTrackId) || track;
-      renderExpanded(previous);
-      ensureTrackLyrics(previous);
-    }
-    if (action === "next") {
-      playFromTrack(track.id, 1);
-      const next = findTrack(state.currentTrackId) || track;
-      renderExpanded(next);
-      ensureTrackLyrics(next);
-    }
+    if (action === "prev") playFromTrack(track.id, -1);
+    if (action === "next") playFromTrack(track.id, 1);
     if (action === "like") toggleFavorite(track.id);
     if (action === "lyrics") setLyricsEnabled(!state.lyricsEnabled);
     if (action === "share") openShareModal(track);
