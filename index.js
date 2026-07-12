@@ -27,7 +27,9 @@ const DEFAULT_CONFIG = {
   fallback: true,
   fallback_count: 139,
   enable_local_library: false,
-  quality: "high"
+  quality: "high",
+  navigation_mode: "auto",
+  content_selector: ""
 };
 
 if (hexo.extend.injector) {
@@ -39,7 +41,7 @@ if (hexo.extend.injector) {
     const assetBase = joinUrl(hexo.config.root || "/", assetRoute);
     const assetVersion = getAssetVersion();
     const cacheSuffix = assetVersion ? `?v=${encodeURIComponent(assetVersion)}` : "";
-    return `<link rel="stylesheet" href="${assetBase}/styles.css${cacheSuffix}">`;
+    return `<link rel="stylesheet" href="${assetBase}/player.css${cacheSuffix}" data-music-wall-player-style>`;
   });
 
   hexo.extend.injector.register("body_end", function musicWallBodyInjector() {
@@ -52,7 +54,9 @@ if (hexo.extend.injector) {
     const cacheSuffix = assetVersion ? `?v=${encodeURIComponent(assetVersion)}` : "";
     const publicConfig = {
       ...buildPublicConfig(config),
-      musicPath: joinUrl(hexo.config.root || "/", route || DEFAULT_CONFIG.path)
+      musicPath: joinUrl(hexo.config.root || "/", route || DEFAULT_CONFIG.path),
+      assetBase,
+      assetVersion
     };
     const json = JSON.stringify(publicConfig).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
     return `<script>window.__HEXO_MUSIC_WALL_GLOBAL_CONFIG__ = ${json};</script><script src="${assetBase}/global-player.js${cacheSuffix}" defer></script>`;
@@ -92,6 +96,11 @@ hexo.extend.generator.register("music_wall", function musicWallGenerator() {
       layout: false
     },
     {
+      path: `${assetRoute}/player.css`,
+      data: fs.readFileSync(path.join(ASSET_DIR, "player.css"), "utf8"),
+      layout: false
+    },
+    {
       path: `${assetRoute}/global-player.js`,
       data: fs.readFileSync(path.join(ASSET_DIR, "global-player.js"), "utf8"),
       layout: false
@@ -124,7 +133,9 @@ function buildPublicConfig(config) {
     fallback: config.fallback !== false,
     fallbackCount: Number(config.fallback_count || config.fallbackCount || DEFAULT_CONFIG.fallback_count),
     enableLocalLibrary: false,
-    quality: config.quality || config.render_quality || config.renderQuality || DEFAULT_CONFIG.quality
+    quality: config.quality || config.render_quality || config.renderQuality || DEFAULT_CONFIG.quality,
+    navigationMode: normalizeNavigationMode(config.navigation_mode || config.navigationMode),
+    contentSelector: String(config.content_selector || config.contentSelector || "").trim()
   };
 }
 
@@ -147,10 +158,15 @@ function joinUrl(root, route) {
 }
 
 function getAssetVersion() {
-  const files = ["styles.css", "app.js", "global-player.js", "night-alley.jpg"].map((file) => path.join(ASSET_DIR, file));
+  const files = ["styles.css", "player.css", "app.js", "global-player.js", "night-alley.jpg"].map((file) => path.join(ASSET_DIR, file));
   const hash = crypto.createHash("sha256");
   for (const file of files) hash.update(fs.readFileSync(file));
   return hash.digest("hex").slice(0, 16);
+}
+
+function normalizeNavigationMode(value) {
+  const mode = String(value || DEFAULT_CONFIG.navigation_mode).toLowerCase();
+  return ["auto", "plugin", "native"].includes(mode) ? mode : DEFAULT_CONFIG.navigation_mode;
 }
 
 function renderComponent(config, assetBase, assetVersion) {

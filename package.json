@@ -1,8 +1,13 @@
 {
   "name": "hexo-generator-music-wall",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Hexo 网易云音乐墙插件，生成沉浸式 3D 歌单页面。",
   "main": "index.js",
+  "scripts": {
+    "build:css": "node scripts/build-css.cjs",
+    "prepack": "npm run build:css",
+    "test": "node --test"
+  },
   "keywords": [
     "hexo",
     "hexo-plugin",
@@ -26,5 +31,8 @@
   ],
   "peerDependencies": {
     "hexo": ">=6"
+  },
+  "devDependencies": {
+    "postcss": "^8.5.6"
   }
 }

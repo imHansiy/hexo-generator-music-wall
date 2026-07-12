@@ -1,6 +1,9 @@
 (() => {
   "use strict";
 
+  if (window.__HEXO_MUSIC_WALL_APP_LOADED__) return;
+  window.__HEXO_MUSIC_WALL_APP_LOADED__ = true;
+
   const STORAGE = {
     favorites: "music-clone:favorites",
     history: "music-clone:history",
@@ -32,6 +35,7 @@
   const CONFIG = normalizeConfig(window.__HEXO_MUSIC_WALL_CONFIG__ || {});
 
   const refs = {
+    app: $("#app"),
     stage: $("#stage"),
     world: $("#world"),
     focusLayer: $("#focusLayer"),
@@ -213,7 +217,9 @@
     osc: [],
     synthStartedAt: 0,
     synthOffset: 0,
-    localEl: new Audio(),
+    localEl: window.__HEXO_MUSIC_WALL_SHARED_AUDIO__ instanceof HTMLMediaElement
+      ? window.__HEXO_MUSIC_WALL_SHARED_AUDIO__
+      : new Audio(),
     localUrl: "",
     localTrackId: "",
     remoteController: null,
@@ -229,14 +235,20 @@
   window.__HEXO_MUSIC_WALL_SHARED_AUDIO__ = audio.localEl;
   window.addEventListener("hexo-music-wall:navigate-before", () => persistNowPlaying(true));
 
-  document.addEventListener("DOMContentLoaded", boot);
+  let booted = false;
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
+  else queueMicrotask(boot);
 
   async function boot() {
+    if (booted || !refs.app?.isConnected) return;
+    booted = true;
     document.body.classList.add("music-wall-page");
+    prepareThemeCompatibility();
     applyConfiguredCopy();
     applyVisualMode();
     applyDesktopLyricsPosition();
     bindGlobalEvents();
+    window.addEventListener("hexo-music-wall:navigated", onMusicWallNavigated);
     if (CONFIG.enableLocalLibrary) await refreshLocalTracks();
     await refreshFeaturedTracks();
     measure();
@@ -245,6 +257,45 @@
     updateMiniPlayer();
     updateEmptyState();
     toast(state.featuredFromPlaylist ? "歌单已载入，拖拽卡片开始探索" : "音乐墙已就绪，拖拽卡片开始探索");
+  }
+
+  function onMusicWallNavigated(event) {
+    if (!event.detail?.isMusicPage || !refs.app?.isConnected) return;
+    prepareThemeCompatibility();
+    measure();
+    updateCardTransforms();
+  }
+
+  function prepareThemeCompatibility() {
+    document.body.dataset.musicWallTheme = detectTheme();
+    document.querySelectorAll(".music-wall-host, .music-wall-page-sibling, .music-wall-page-meta").forEach((node) => {
+      node.classList.remove("music-wall-host", "music-wall-page-sibling", "music-wall-page-meta");
+    });
+
+    let node = refs.app.parentElement;
+    while (node && node !== document.body) {
+      node.classList.add("music-wall-host");
+      if (node.parentElement !== document.body) {
+        for (const sibling of node.parentElement?.children || []) {
+          if (sibling === node || sibling.matches("script, style, link, header, nav, footer")) continue;
+          sibling.classList.add("music-wall-page-sibling");
+        }
+      }
+      node = node.parentElement;
+    }
+
+    document.querySelectorAll(".article-meta, .article-header, .article-footer, .post-meta, .post-header, .post-footer").forEach((meta) => {
+      if (meta.closest(".music-wall-host")) meta.classList.add("music-wall-page-meta");
+    });
+  }
+
+  function detectTheme() {
+    if (document.querySelector("#l_body, #l_main")) return "volantis";
+    if (document.querySelector("#page-header, #content-inner") && document.querySelector("#nav")) return "butterfly";
+    if (document.querySelector("#header-title") && document.querySelector("#wrap > .outer")) return "landscape";
+    if (document.querySelector(".main-inner") && document.querySelector("main#main")) return "next";
+    if (document.querySelector("#board") && document.querySelector("#navbar")) return "fluid";
+    return "generic";
   }
 
   function applyConfiguredCopy() {
