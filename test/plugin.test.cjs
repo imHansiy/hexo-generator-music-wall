@@ -63,5 +63,7 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   const wallApp = fs.readFileSync(path.join(__dirname, "..", "assets", "app.js"), "utf8");
   assert.match(globalPlayer, /state\.drag\.suppressClick && !action/);
   assert.match(globalPlayer, /dispatchPlaybackCommand\("pause"\)/);
+  assert.match(globalPlayer, /root\.addEventListener\("pointerdown"/);
+  assert.match(globalPlayer, /runPlayerAction\(action\)/);
   assert.match(wallApp, /hexo-music-wall:playback-command/);
 });

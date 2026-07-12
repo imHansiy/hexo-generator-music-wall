@@ -37,6 +37,7 @@
     requestId: 0,
     status: "",
     lastPersistAt: 0,
+    controlPress: { action: "", at: 0 },
     root: null,
     lyricsRoot: null,
     drag: {
@@ -380,6 +381,12 @@
 
     root.addEventListener("click", (event) => {
       const action = event.target.closest("[data-action]")?.dataset.action;
+      if (action && state.controlPress.action === action && Date.now() - state.controlPress.at < 1000) {
+        state.controlPress.action = "";
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (state.drag.suppressClick && !action) {
         state.drag.suppressClick = false;
         event.preventDefault();
@@ -388,14 +395,18 @@
       }
       state.drag.suppressClick = false;
       if (!action) return;
-      if (action === "toggle") togglePlayback();
-      if (action === "prev") playRelative(-1);
-      if (action === "next") playRelative(1);
-      if (action === "loop") toggleLoop();
-      if (action === "lyrics") toggleLyrics();
-      if (action === "favorite") toggleFavorite();
-      if (action === "collapse") setCollapsed(!state.collapsed);
+      runPlayerAction(action);
     });
+
+    root.addEventListener("pointerdown", (event) => {
+      const action = event.target.closest("[data-action]")?.dataset.action;
+      if (!action || event.button !== 0 || event.isPrimary === false) return;
+      state.controlPress = { action, at: Date.now() };
+      state.drag.suppressClick = false;
+      event.preventDefault();
+      event.stopPropagation();
+      runPlayerAction(action);
+    }, true);
 
     const progress = root.querySelector(".mw-float-progress");
     progress.addEventListener("pointerdown", () => { state.seeking = true; });
@@ -424,6 +435,16 @@
     `;
     document.body.appendChild(lyricsRoot);
     state.lyricsRoot = lyricsRoot;
+  }
+
+  function runPlayerAction(action) {
+    if (action === "toggle") togglePlayback();
+    if (action === "prev") playRelative(-1);
+    if (action === "next") playRelative(1);
+    if (action === "loop") toggleLoop();
+    if (action === "lyrics") toggleLyrics();
+    if (action === "favorite") toggleFavorite();
+    if (action === "collapse") setCollapsed(!state.collapsed);
   }
 
   function bindAudioEvents() {
