@@ -58,4 +58,10 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.doesNotMatch(wallCss, /^\.icon-button/m);
   assert.match(playerCss, /\.music-wall-floating-player/);
   assert.doesNotMatch(playerCss, /^\.stage/m);
+
+  const globalPlayer = fs.readFileSync(path.join(__dirname, "..", "assets", "global-player.js"), "utf8");
+  const wallApp = fs.readFileSync(path.join(__dirname, "..", "assets", "app.js"), "utf8");
+  assert.match(globalPlayer, /state\.drag\.suppressClick && !action/);
+  assert.match(globalPlayer, /dispatchPlaybackCommand\("pause"\)/);
+  assert.match(wallApp, /hexo-music-wall:playback-command/);
 });

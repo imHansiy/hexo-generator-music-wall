@@ -8,6 +8,7 @@
   const STORAGE_LOOP = "music-clone:floatingPlayerLoop";
   const STORAGE_POSITION = "music-clone:floatingPlayerPosition";
   const STORAGE_LYRICS = "music-clone:lyrics";
+  const PLAYBACK_COMMAND_EVENT = "hexo-music-wall:playback-command";
   const SYNTH_DURATION = 96;
   const CONFIG = window.__HEXO_MUSIC_WALL_GLOBAL_CONFIG__ || {};
   const MUSIC_PATH = normalizePath(CONFIG.musicPath || "/music/");
@@ -378,13 +379,14 @@
     `;
 
     root.addEventListener("click", (event) => {
-      if (state.drag.suppressClick) {
+      const action = event.target.closest("[data-action]")?.dataset.action;
+      if (state.drag.suppressClick && !action) {
         state.drag.suppressClick = false;
         event.preventDefault();
         event.stopPropagation();
         return;
       }
-      const action = event.target.closest("[data-action]")?.dataset.action;
+      state.drag.suppressClick = false;
       if (!action) return;
       if (action === "toggle") togglePlayback();
       if (action === "prev") playRelative(-1);
@@ -547,7 +549,8 @@
   }
 
   function togglePlayback() {
-    if (state.playing || state.loading) {
+    const mediaIsPlaying = state.mode === "media" && !state.audio.paused && !state.audio.ended;
+    if (mediaIsPlaying || state.playing || state.loading || state.synth.playing) {
       pausePlayback();
       return;
     }
@@ -557,6 +560,7 @@
 
   async function startPlayback(allowFallback) {
     const requestId = ++state.requestId;
+    dispatchPlaybackCommand("play");
     state.loading = true;
     state.status = state.data.audio && state.data.audioKind !== "synth" ? "正在连接音频..." : "";
     syncView();
@@ -589,7 +593,10 @@
   function pausePlayback() {
     ++state.requestId;
     const current = currentPlaybackTime();
-    if (state.mode === "media") state.audio.pause();
+    dispatchPlaybackCommand("pause");
+    if (!state.audio.paused) {
+      try { state.audio.pause(); } catch (_) {}
+    }
     if (state.mode === "synth") stopSynth(true);
     state.data.currentTime = current;
     state.playing = false;
@@ -598,6 +605,12 @@
     state.status = "";
     persist(true);
     syncView();
+  }
+
+  function dispatchPlaybackCommand(action) {
+    window.dispatchEvent(new CustomEvent(PLAYBACK_COMMAND_EVENT, {
+      detail: { action, source: "floating-player" },
+    }));
   }
 
   function stopPlayback() {

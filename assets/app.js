@@ -234,6 +234,7 @@
   audio.localEl.volume = state.volume;
   window.__HEXO_MUSIC_WALL_SHARED_AUDIO__ = audio.localEl;
   window.addEventListener("hexo-music-wall:navigate-before", () => persistNowPlaying(true));
+  window.addEventListener("hexo-music-wall:playback-command", onSharedPlaybackCommand);
 
   let booted = false;
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
@@ -264,6 +265,21 @@
     prepareThemeCompatibility();
     measure();
     updateCardTransforms();
+  }
+
+  function onSharedPlaybackCommand(event) {
+    if (event.detail?.source !== "floating-player") return;
+    if (event.detail.action === "play") {
+      audio.pauseRequested = false;
+      return;
+    }
+    if (event.detail.action !== "pause") return;
+    audio.pauseRequested = true;
+    if (!isCurrentMedia()) return;
+    state.currentTime = audio.localEl.currentTime || state.currentTime || 0;
+    state.isPlaying = false;
+    stopPlaybackClock(state.currentTime);
+    updatePlaybackViews();
   }
 
   function prepareThemeCompatibility() {
