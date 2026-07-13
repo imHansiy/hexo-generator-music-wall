@@ -66,8 +66,8 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(globalPlayer, /root\.addEventListener\("pointerdown"/);
   assert.match(globalPlayer, /runPlayerAction\(action\)/);
   assert.match(globalPlayer, /collapsed: true/);
-  assert.match(globalPlayer, /data-action="music"/);
-  assert.match(globalPlayer, /function openMusicWall\(\)/);
+  assert.match(globalPlayer, /href="\$\{MUSIC_PATH\}"/);
+  assert.match(globalPlayer, /进入音乐墙/);
   assert.doesNotMatch(globalPlayer, /data-action="collapse"/);
   assert.match(wallApp, /hexo-music-wall:playback-command/);
 });

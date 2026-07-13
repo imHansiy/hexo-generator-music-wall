@@ -353,7 +353,7 @@
           <button class="mw-float-icon mw-float-loop" type="button" data-action="loop" aria-label="单曲循环" title="单曲循环">${icon("repeat")}</button>
           <button class="mw-float-icon mw-float-lyrics-toggle" type="button" data-action="lyrics" aria-label="歌词显示" title="显示或隐藏歌词">${icon("lyrics")}</button>
           <button class="mw-float-icon mw-float-favorite" type="button" data-action="favorite" aria-label="喜欢" title="喜欢">${icon("heart")}</button>
-          <button class="mw-float-icon mw-float-music-wall" type="button" data-action="music" aria-label="进入音乐墙" title="进入音乐墙">${icon("wall")}</button>
+          <a class="mw-float-icon mw-float-music-wall" href="${MUSIC_PATH}" aria-label="进入音乐墙" title="进入音乐墙">${icon("wall")}</a>
         </div>
         <div class="mw-float-progress-row">
           <span class="mw-float-current">0:00</span>
@@ -439,16 +439,6 @@
     if (action === "loop") toggleLoop();
     if (action === "lyrics") toggleLyrics();
     if (action === "favorite") toggleFavorite();
-    if (action === "music") openMusicWall();
-  }
-
-  function openMusicWall() {
-    const link = document.createElement("a");
-    link.href = MUSIC_PATH;
-    link.hidden = true;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
   }
 
   function bindAudioEvents() {

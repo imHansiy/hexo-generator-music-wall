@@ -38,11 +38,14 @@
   pointer-events: none;
 }
 
-.music-wall-floating-player button {
+.music-wall-floating-player button,
+.music-wall-floating-player a {
   margin: 0;
   border: 0;
   padding: 0;
+  color: inherit;
   font: inherit;
+  text-decoration: none;
   background: transparent;
   box-shadow: none;
   cursor: pointer;
