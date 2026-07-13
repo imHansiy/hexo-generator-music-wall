@@ -77,6 +77,8 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(globalPlayer, /function refreshGlobalPlayerFromSharedAudio\(\)/);
   assert.match(globalPlayer, /function runNavigationCompleteHooks\(url\)/);
   assert.match(globalPlayer, /volantisComplete\.call/);
+  assert.match(globalPlayer, /runNavigationCompleteHooks\(url\.href\);\s+window\.dispatchEvent\(new CustomEvent\("hexo-music-wall:navigated"/);
+  assert.match(globalPlayer, /state\.musicPageActive \? 240 : 34/);
   assert.match(wallApp, /hexo-music-wall:playback-command/);
   assert.match(wallApp, /function onMusicWallNavigateBefore\(\)/);
   assert.match(wallApp, /document\.addEventListener\("pjax:send", onThemePjaxSend\)/);
@@ -84,7 +86,10 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(wallApp, /incomingApp !== refs\.app/);
   assert.match(wallApp, /function installMountObserver\(\)/);
   assert.match(wallApp, /observer\.observe\(document\.documentElement, \{ childList: true, subtree: true \}\)/);
-  assert.match(wallApp, /window\.setInterval\(reconcileMusicWallMount, 300\)/);
+  assert.doesNotMatch(wallApp, /window\.setInterval\(reconcileMusicWallMount, 300\)/);
+  assert.match(wallApp, /function installStageResizeObserver\(\)/);
+  assert.match(wallApp, /state\.stageResizeObserver\.observe\(refs\.stage\)/);
+  assert.match(wallApp, /const maxPixels = state\.performanceLite \? 1_350_000 : 2_200_000/);
   assert.match(wallApp, /function reconcileMusicWallMount\(\)/);
   assert.match(wallApp, /if \(!incomingApp\)/);
   assert.match(wallApp, /const needsActivation = !state\.mountPresent \|\| replaced \|\| !state\.pageActive/);

@@ -37,6 +37,8 @@
     status: "",
     lastPersistAt: 0,
     controlPress: { action: "", at: 0 },
+    musicPageActive: Boolean(document.querySelector(".music-wall-embed")),
+    lastTickAt: 0,
     root: null,
     lyricsRoot: null,
     drag: {
@@ -153,6 +155,7 @@
 
   window.addEventListener("hexo-music-wall:navigated", (event) => {
     const isMusicPage = Boolean(event.detail?.isMusicPage);
+    state.musicPageActive = isMusicPage;
     if (state.root) state.root.hidden = isMusicPage;
     if (state.lyricsRoot) state.lyricsRoot.hidden = isMusicPage;
   });
@@ -289,8 +292,8 @@
         const isMusicPage = normalizePath(url.pathname) === MUSIC_PATH;
         document.body.classList.toggle("music-wall-page", isMusicPage);
         if (isMusicPage) await ensureMusicWallAssets();
-        window.dispatchEvent(new CustomEvent("hexo-music-wall:navigated", { detail: { url: url.href, isMusicPage } }));
         runNavigationCompleteHooks(url.href);
+        window.dispatchEvent(new CustomEvent("hexo-music-wall:navigated", { detail: { url: url.href, isMusicPage } }));
       } catch (error) {
         console.warn("[hexo-music-wall] 无缝导航失败，已回退到普通跳转。", error);
         location.href = url.href;
@@ -1039,7 +1042,12 @@
     state.root.querySelector(".mw-float-progress").style.setProperty("--mw-progress", `${clamp(value, 0, 100)}%`);
   }
 
-  function tick() {
+  function tick(time = 0) {
+    if (time - state.lastTickAt < (state.musicPageActive ? 240 : 34)) {
+      requestAnimationFrame(tick);
+      return;
+    }
+    state.lastTickAt = time;
     if (state.root && state.playing && !state.seeking) {
       const current = currentPlaybackTime();
       const duration = getDuration();
@@ -1051,7 +1059,7 @@
         else playRelative(1);
       } else {
         persist(false);
-        syncView();
+        if (!state.musicPageActive) syncView();
       }
     }
     requestAnimationFrame(tick);

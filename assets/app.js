@@ -192,6 +192,8 @@
     expandedTrackId: null,
     seekDraft: null,
     raf: 0,
+    resizeRaf: 0,
+    stageResizeObserver: null,
     renderKey: "",
     lastFrame: now(),
     lastRenderedCount: 0,
@@ -254,6 +256,7 @@
     applyVisualMode();
     applyDesktopLyricsPosition();
     bindGlobalEvents();
+    installStageResizeObserver();
     window.addEventListener("hexo-music-wall:navigated", onMusicWallNavigated);
     if (CONFIG.enableLocalLibrary) await refreshLocalTracks();
     await refreshFeaturedTracks();
@@ -301,6 +304,8 @@
     refs.stage?.classList.remove("dragging");
     if (state.raf) cancelAnimationFrame(state.raf);
     state.raf = 0;
+    if (state.resizeRaf) cancelAnimationFrame(state.resizeRaf);
+    state.resizeRaf = 0;
   }
 
   function onThemePjaxSend() {
@@ -316,17 +321,37 @@
   }
 
   function installMountObserver() {
-    let queued = false;
+    let queuedFrame = 0;
     const observer = new MutationObserver(() => {
-      if (queued) return;
-      queued = true;
-      queueMicrotask(() => {
-        queued = false;
+      if (queuedFrame) return;
+      queuedFrame = requestAnimationFrame(() => {
+        queuedFrame = 0;
         reconcileMusicWallMount();
       });
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
-    window.setInterval(reconcileMusicWallMount, 300);
+  }
+
+  function installStageResizeObserver() {
+    if (!window.ResizeObserver || state.stageResizeObserver || !refs.stage) return;
+    state.stageResizeObserver = new ResizeObserver(() => scheduleStageResize());
+    state.stageResizeObserver.observe(refs.stage);
+  }
+
+  function scheduleStageResize() {
+    if (!state.pageActive || !refs.app?.isConnected || state.resizeRaf) return;
+    const nextSize = readStageSize();
+    if (!nextSize) return;
+    if (Math.abs(nextSize.w - state.size.w) < 2 && Math.abs(nextSize.h - state.size.h) < 2) return;
+    state.resizeRaf = requestAnimationFrame(() => {
+      state.resizeRaf = 0;
+      if (!state.pageActive || !refs.app?.isConnected || !measure()) return;
+      rebuildLayout();
+      if (state.currentTrackId) focusTrackInWall(state.currentTrackId, { immediate: true, resetTile: true });
+      state.renderKey = "";
+      updateInstances();
+      state.mouseDirty = true;
+    });
   }
 
   function reconcileMusicWallMount() {
@@ -830,14 +855,27 @@
     return CONFIG.playlists[0]?.sourceKey || "featured";
   }
 
-  function measure() {
+  function readStageSize() {
     const rect = refs.stage.getBoundingClientRect();
-    state.size.w = rect.width;
-    state.size.h = rect.height;
-    state.mouse.x = rect.width / 2;
-    state.mouse.y = rect.height / 2;
+    if (rect.width < 2 || rect.height < 2) return null;
+    const viewportWidth = Math.max(320, window.visualViewport?.width || window.innerWidth || rect.width);
+    const viewportHeight = Math.max(320, window.visualViewport?.height || window.innerHeight || rect.height);
+    return {
+      w: Math.min(rect.width, viewportWidth),
+      h: Math.min(rect.height, Math.max(560, viewportHeight)),
+    };
+  }
+
+  function measure() {
+    const nextSize = readStageSize();
+    if (!nextSize) return false;
+    state.size.w = nextSize.w;
+    state.size.h = nextSize.h;
+    state.mouse.x = nextSize.w / 2;
+    state.mouse.y = nextSize.h / 2;
     resizeVisualizer();
     applyDesktopLyricsPosition();
+    return true;
   }
 
   function applySource(source, options = {}) {
@@ -1076,7 +1114,9 @@
 
   function resizeVisualizer() {
     if (!refs.visualizer || !state.size.w || !state.size.h) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 1.35);
+    const maxPixels = state.performanceLite ? 1_350_000 : 2_200_000;
+    const areaLimitedDpr = Math.sqrt(maxPixels / Math.max(1, state.size.w * state.size.h));
+    const dpr = Math.max(0.65, Math.min(window.devicePixelRatio || 1, 1.35, areaLimitedDpr));
     const width = Math.max(1, Math.round(state.size.w * dpr));
     const height = Math.max(1, Math.round(state.size.h * dpr));
     if (refs.visualizer.width === width && refs.visualizer.height === height && state.visualizerCtx) return;
