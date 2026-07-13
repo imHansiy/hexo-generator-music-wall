@@ -236,6 +236,8 @@
   window.__HEXO_MUSIC_WALL_SHARED_AUDIO__ = audio.localEl;
   window.addEventListener("hexo-music-wall:navigate-before", onMusicWallNavigateBefore);
   window.addEventListener("hexo-music-wall:playback-command", onSharedPlaybackCommand);
+  document.addEventListener("pjax:send", onThemePjaxSend);
+  document.addEventListener("pjax:complete", onThemePjaxComplete);
 
   let booted = false;
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
@@ -292,6 +294,18 @@
     refs.stage?.classList.remove("dragging");
     if (state.raf) cancelAnimationFrame(state.raf);
     state.raf = 0;
+  }
+
+  function onThemePjaxSend() {
+    onMusicWallNavigateBefore();
+  }
+
+  function onThemePjaxComplete(event) {
+    if (event.detail?.source === "hexo-music-wall") return;
+    const incomingApp = document.querySelector(".music-wall-embed");
+    if (!incomingApp) return;
+    if (incomingApp !== refs.app) incomingApp.replaceWith(refs.app);
+    onMusicWallNavigated({ detail: { isMusicPage: true } });
   }
 
   function restorePlaybackFromSharedState() {
