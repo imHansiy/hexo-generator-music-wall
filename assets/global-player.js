@@ -269,6 +269,7 @@
             title: nextDocument.title,
             bodyClass: nextDocument.body.className,
             bodyTheme: nextDocument.body.dataset.musicWallTheme || "",
+            pjaxScripts: collectPjaxScripts(nextDocument, url.href),
           };
         }
 
@@ -279,6 +280,7 @@
           title: document.title,
           bodyClass: document.body.className,
           bodyTheme: document.body.dataset.musicWallTheme || "",
+          pjaxScripts: collectPjaxScripts(document, location.href),
         });
 
         currentShell.replaceWith(nextEntry.shell);
@@ -288,6 +290,7 @@
         else delete document.body.dataset.musicWallTheme;
         if (push) history.pushState({ musicWallNavigation: true }, "", url.href);
         activeKey = nextKey;
+        runPjaxScripts(nextEntry.pjaxScripts);
         window.scrollTo({ top: 0, left: 0, behavior: "instant" });
         const isMusicPage = normalizePath(url.pathname) === MUSIC_PATH;
         document.body.classList.toggle("music-wall-page", isMusicPage);
@@ -300,6 +303,40 @@
       } finally {
         navigating = false;
         document.documentElement.classList.remove("music-wall-navigating");
+      }
+    }
+
+    function collectPjaxScripts(targetDocument, sourceUrl) {
+      return [...targetDocument.querySelectorAll("pjax script")].map((script) => ({
+        sourceUrl,
+        content: script.textContent || "",
+        attributes: [...script.attributes].map((attribute) => [attribute.name, attribute.value]),
+      }));
+    }
+
+    function runPjaxScripts(scripts) {
+      for (const descriptor of scripts || []) {
+        const script = document.createElement("script");
+        let source = "";
+        for (const [name, value] of descriptor.attributes || []) {
+          if (name.toLowerCase() === "src") source = value;
+          else script.setAttribute(name, value);
+        }
+        script.dataset.musicWallPjaxScript = "";
+        if (source) {
+          script.async = false;
+          script.src = new URL(source, descriptor.sourceUrl || location.href).href;
+          script.addEventListener("load", () => script.remove(), { once: true });
+          script.addEventListener("error", () => {
+            console.warn(`[hexo-music-wall] 无法执行页面脚本 ${script.src}`);
+            script.remove();
+          }, { once: true });
+          document.head.appendChild(script);
+          continue;
+        }
+        script.textContent = descriptor.content || "";
+        document.head.appendChild(script);
+        script.remove();
       }
     }
 

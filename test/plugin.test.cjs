@@ -77,6 +77,11 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(globalPlayer, /function refreshGlobalPlayerFromSharedAudio\(\)/);
   assert.match(globalPlayer, /function runNavigationCompleteHooks\(url\)/);
   assert.match(globalPlayer, /volantisComplete\.call/);
+  assert.match(globalPlayer, /pjaxScripts: collectPjaxScripts\(nextDocument, url\.href\)/);
+  assert.match(globalPlayer, /pjaxScripts: collectPjaxScripts\(document, location\.href\)/);
+  assert.match(globalPlayer, /function collectPjaxScripts\(targetDocument, sourceUrl\)/);
+  assert.match(globalPlayer, /targetDocument\.querySelectorAll\("pjax script"\)/);
+  assert.match(globalPlayer, /runPjaxScripts\(nextEntry\.pjaxScripts\)/);
   assert.match(globalPlayer, /runNavigationCompleteHooks\(url\.href\);\s+window\.dispatchEvent\(new CustomEvent\("hexo-music-wall:navigated"/);
   assert.match(globalPlayer, /state\.musicPageActive \? 240 : 34/);
   assert.match(wallApp, /hexo-music-wall:playback-command/);
