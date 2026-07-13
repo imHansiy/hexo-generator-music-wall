@@ -70,4 +70,8 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(globalPlayer, /进入音乐墙/);
   assert.doesNotMatch(globalPlayer, /data-action="collapse"/);
   assert.match(wallApp, /hexo-music-wall:playback-command/);
+  assert.match(wallApp, /function onMusicWallNavigateBefore\(\)/);
+  assert.match(wallApp, /function restorePlaybackFromSharedState\(\)/);
+  assert.match(wallApp, /function startFrameLoop\(\)/);
+  assert.match(wallApp, /if \(!state\.pageActive \|\| !refs\.app\?\.isConnected\)/);
 });

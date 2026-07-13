@@ -206,6 +206,7 @@
     playbackClockStartedAt: 0,
     playbackClockOffset: 0,
     performanceLite: false,
+    pageActive: true,
   };
 
   const audio = {
@@ -233,7 +234,7 @@
   audio.localEl.preload = "auto";
   audio.localEl.volume = state.volume;
   window.__HEXO_MUSIC_WALL_SHARED_AUDIO__ = audio.localEl;
-  window.addEventListener("hexo-music-wall:navigate-before", () => persistNowPlaying(true));
+  window.addEventListener("hexo-music-wall:navigate-before", onMusicWallNavigateBefore);
   window.addEventListener("hexo-music-wall:playback-command", onSharedPlaybackCommand);
 
   let booted = false;
@@ -254,7 +255,7 @@
     await refreshFeaturedTracks();
     measure();
     applySource(state.source, { silent: true });
-    requestAnimationFrame(frame);
+    startFrameLoop();
     updateMiniPlayer();
     updateEmptyState();
     toast(state.featuredFromPlaylist ? "歌单已载入，拖拽卡片开始探索" : "音乐墙已就绪，拖拽卡片开始探索");
@@ -262,9 +263,66 @@
 
   function onMusicWallNavigated(event) {
     if (!event.detail?.isMusicPage || !refs.app?.isConnected) return;
+    state.pageActive = true;
+    state.pointer.active = false;
+    state.pointer.id = null;
+    state.velocity.x = 0;
+    state.velocity.y = 0;
     prepareThemeCompatibility();
     measure();
-    updateCardTransforms();
+    restorePlaybackFromSharedState();
+    rebuildLayout();
+    if (state.currentTrackId) focusTrackInWall(state.currentTrackId, { immediate: true });
+    else centerWorld();
+    state.renderKey = "";
+    updateInstances();
+    updatePlaybackViews();
+    startFrameLoop();
+  }
+
+  function onMusicWallNavigateBefore() {
+    if (!state.pageActive) return;
+    persistNowPlaying(true);
+    state.pageActive = false;
+    state.pointer.active = false;
+    state.pointer.id = null;
+    state.velocity.x = 0;
+    state.velocity.y = 0;
+    refs.stage?.classList.remove("dragging");
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.raf = 0;
+  }
+
+  function restorePlaybackFromSharedState() {
+    const saved = readJson(STORAGE.nowPlaying, null);
+    if (!saved) return;
+    const candidates = [
+      ...state.tracks,
+      ...Object.values(state.playlistTracks).flat(),
+      ...state.localTracks,
+      ...state.featuredTracks,
+    ];
+    const track = candidates.find((item) => String(item.id) === String(saved.id))
+      || candidates.find((item) => item.title === saved.title && item.artist === saved.artist);
+    if (!track) return;
+    state.currentTrackId = track.id;
+    audio.localTrackId = track.id;
+    state.currentTime = Number.isFinite(audio.localEl.currentTime)
+      ? audio.localEl.currentTime
+      : Number(saved.currentTime) || 0;
+    state.duration = mediaDuration(track) || Number(saved.duration) || SYNTH_DURATION;
+    state.isPlaying = !audio.localEl.paused && !audio.localEl.ended;
+    state.focusActive = true;
+    if (state.isPlaying) startPlaybackClock(state.currentTime);
+    else stopPlaybackClock(state.currentTime);
+    syncExpandedToTrack(track);
+    if (state.lyricsEnabled) ensureTrackLyrics(track);
+  }
+
+  function startFrameLoop() {
+    if (!state.pageActive || state.raf || !refs.app?.isConnected) return;
+    state.lastFrame = now();
+    state.raf = requestAnimationFrame(frame);
   }
 
   function onSharedPlaybackCommand(event) {
@@ -275,6 +333,7 @@
     }
     if (event.detail.action !== "pause") return;
     audio.pauseRequested = true;
+    if (!state.pageActive) return;
     if (!isCurrentMedia()) return;
     state.currentTime = audio.localEl.currentTime || state.currentTime || 0;
     state.isPlaying = false;
@@ -594,6 +653,7 @@
 
   function bindGlobalEvents() {
     window.addEventListener("resize", () => {
+      if (!state.pageActive) return;
       measure();
       rebuildLayout();
       state.mouseDirty = true;
@@ -637,14 +697,14 @@
     refs.historyButton?.addEventListener("click", () => openHistoryPanel());
 
     audio.localEl.addEventListener("timeupdate", () => {
-      if (isCurrentMedia()) {
+      if (state.pageActive && isCurrentMedia()) {
         state.currentTime = audio.localEl.currentTime || 0;
         state.duration = mediaDuration(findTrack(state.currentTrackId));
         updatePlaybackViews();
       }
     });
     audio.localEl.addEventListener("loadedmetadata", () => {
-      if (isCurrentMedia()) {
+      if (state.pageActive && isCurrentMedia()) {
         state.duration = mediaDuration(findTrack(state.currentTrackId));
         updatePlaybackViews();
       }
@@ -655,6 +715,7 @@
     audio.localEl.addEventListener("canplay", showRemoteReady);
     audio.localEl.addEventListener("playing", showRemoteReady);
     audio.localEl.addEventListener("play", () => {
+      if (!state.pageActive) return;
       if (!isCurrentMedia()) return;
       if (audio.pauseRequested) {
         audio.localEl.pause();
@@ -664,6 +725,7 @@
       updatePlaybackViews();
     });
     audio.localEl.addEventListener("pause", () => {
+      if (!state.pageActive) return;
       if (isCurrentMedia() && audio.localEl.paused && (!audio.switching || audio.pauseRequested)) {
         state.isPlaying = false;
         stopPlaybackClock(audio.localEl.currentTime || state.currentTime || 0);
@@ -671,9 +733,11 @@
       }
     });
     audio.localEl.addEventListener("ended", () => {
+      if (!state.pageActive) return;
       if (isCurrentMedia()) handleEnded();
     });
     audio.localEl.addEventListener("error", () => {
+      if (!state.pageActive) return;
       if (isCurrentMedia() && !audio.pauseRequested && !audio.switching) {
         const track = findTrack(state.currentTrackId);
         if (track?.audio && !track.local) failRemotePlayback(track);
@@ -686,6 +750,7 @@
     });
 
     window.addEventListener("keydown", (event) => {
+      if (!state.pageActive) return;
       const target = event.target;
       const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
       if (typing) return;
@@ -703,7 +768,9 @@
         closePanel();
       }
     });
-    window.addEventListener("beforeunload", () => persistNowPlaying(true));
+    window.addEventListener("beforeunload", () => {
+      if (state.pageActive) persistNowPlaying(true);
+    });
   }
 
   function defaultSource() {
@@ -874,6 +941,7 @@
   }
 
   function onPointerMove(event) {
+    if (!state.pageActive) return;
     const rect = refs.stage.getBoundingClientRect();
     state.mouse.x = event.clientX - rect.left;
     state.mouse.y = event.clientY - rect.top;
@@ -909,6 +977,10 @@
   }
 
   function frame(time) {
+    if (!state.pageActive || !refs.app?.isConnected) {
+      state.raf = 0;
+      return;
+    }
     const dt = Math.min(180, Math.max(0, time - state.lastFrame));
     state.lastFrame = time;
     if (!state.pointer.active) {
@@ -1679,6 +1751,7 @@
   }
 
   function showRemoteBuffering() {
+    if (!state.pageActive) return;
     if (!isCurrentMedia() || audio.pauseRequested) return;
     const track = findTrack(state.currentTrackId);
     refs.miniPlayer?.classList.add("is-buffering");
@@ -1687,6 +1760,7 @@
   }
 
   function showRemoteReady() {
+    if (!state.pageActive) return;
     if (!isCurrentMedia() || audio.pauseRequested) return;
     const track = findTrack(state.currentTrackId);
     refs.miniPlayer?.classList.remove("is-buffering");
