@@ -156,7 +156,7 @@
 
     window.addEventListener("click", (event) => {
       const link = event.target.closest("a[href]");
-      if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       if (link.target && link.target !== "_self") return;
       if (link.hasAttribute("download") || link.getAttribute("rel")?.split(/\s+/).includes("external")) return;
       const url = new URL(link.href, location.href);
