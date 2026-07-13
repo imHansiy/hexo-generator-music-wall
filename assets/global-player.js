@@ -62,6 +62,7 @@
 
   window.__HEXO_MUSIC_WALL_SHARED_AUDIO__ = state.audio;
 
+  installThemePjaxGuard();
   installPersistentNavigation();
 
   if (!document.querySelector(".music-wall-embed")) bootGlobalPlayer();
@@ -71,8 +72,10 @@
 
   function bootGlobalPlayer() {
     if (state.root?.isConnected) {
+      refreshGlobalPlayerFromSharedAudio();
       state.root.hidden = false;
       if (state.lyricsRoot) state.lyricsRoot.hidden = false;
+      syncView();
       return;
     }
     state.data = readJson(STORAGE_NOW_PLAYING, null);
@@ -103,6 +106,49 @@
     hydrateQueue();
     loadLyrics();
     window.addEventListener("resize", clampPlayerPosition);
+  }
+
+  function refreshGlobalPlayerFromSharedAudio() {
+    const previousTrackId = String(state.data?.id || "");
+    const nextData = readJson(STORAGE_NOW_PLAYING, null);
+    if (nextData) state.data = nextData;
+    state.queue = normalizeStoredQueue(readJson(STORAGE_QUEUE, []));
+
+    const adoptedAudio = window.__HEXO_MUSIC_WALL_SHARED_AUDIO__;
+    if (adoptedAudio instanceof HTMLMediaElement) state.audio = adoptedAudio;
+    const currentUrl = state.audio.currentSrc || state.audio.src || "";
+    if (currentUrl) state.audioUrl = currentUrl;
+    const mediaPlaying = !state.audio.paused && !state.audio.ended;
+    const synthPlaying = state.synth.playing;
+    state.playing = mediaPlaying || synthPlaying;
+    state.loading = false;
+    state.mode = currentUrl ? "media" : (synthPlaying ? "synth" : "idle");
+    if (state.data) {
+      state.data.isPlaying = state.playing;
+      if (mediaPlaying && Number.isFinite(state.audio.currentTime)) state.data.currentTime = state.audio.currentTime;
+    }
+    alignCurrentWithQueue();
+    state.status = state.playing || state.synth.playing ? "" : (state.data?.isPlaying ? "点击播放以继续" : "");
+    if (previousTrackId !== String(state.data?.id || "")) loadLyrics();
+  }
+
+  function installThemePjaxGuard() {
+    if (window.__HEXO_MUSIC_WALL_PJAX_GUARD__) return;
+    window.__HEXO_MUSIC_WALL_PJAX_GUARD__ = true;
+    window.addEventListener("pjax:send", guardThemePjaxSend, true);
+  }
+
+  function guardThemePjaxSend(event) {
+    const shared = window.__HEXO_MUSIC_WALL_SHARED_AUDIO__;
+    const mediaPlaying = shared instanceof HTMLMediaElement && !shared.paused && !shared.ended;
+    const saved = readJson(STORAGE_NOW_PLAYING, null);
+    if (!mediaPlaying && !state.loading && !state.synth.playing && !saved?.isPlaying) return;
+
+    window.dispatchEvent(new CustomEvent("hexo-music-wall:navigate-before", {
+      detail: { source: "theme-pjax" },
+    }));
+    // Volantis calls window.stop() in pjax:send, which aborts a streaming audio response.
+    event.stopImmediatePropagation();
   }
 
   window.addEventListener("hexo-music-wall:navigated", (event) => {
@@ -244,7 +290,7 @@
         document.body.classList.toggle("music-wall-page", isMusicPage);
         if (isMusicPage) await ensureMusicWallAssets();
         window.dispatchEvent(new CustomEvent("hexo-music-wall:navigated", { detail: { url: url.href, isMusicPage } }));
-        document.dispatchEvent(new CustomEvent("pjax:complete", { detail: { url: url.href, source: "hexo-music-wall" } }));
+        runNavigationCompleteHooks(url.href);
       } catch (error) {
         console.warn("[hexo-music-wall] 无缝导航失败，已回退到普通跳转。", error);
         location.href = url.href;
@@ -252,6 +298,17 @@
         navigating = false;
         document.documentElement.classList.remove("music-wall-navigating");
       }
+    }
+
+    function runNavigationCompleteHooks(url) {
+      const detail = { url, source: "hexo-music-wall" };
+      const volantisComplete = window.volantis?.pjax?.method?.complete?.start;
+      if (typeof volantisComplete === "function") {
+        document.dispatchEvent(new CustomEvent("pjax:success", { detail }));
+        volantisComplete.call(window.volantis.pjax.method.complete);
+        return;
+      }
+      document.dispatchEvent(new CustomEvent("pjax:complete", { detail }));
     }
 
     function shouldHandleNavigation(url) {
@@ -848,7 +905,7 @@
     });
     state.synth.offset = offset;
     state.synth.startedAt = context.currentTime - offset;
-    state.synth.clockStartedAt = performance.now() - offset * 1000;
+    state.synth.clockStartedAt = Date.now() - offset * 1000;
     state.synth.playing = true;
     state.mode = "synth";
     state.loading = false;
@@ -873,8 +930,8 @@
   function currentPlaybackTime() {
     const duration = getDuration();
     if (state.mode === "media") return clamp(state.audio.currentTime || state.data.currentTime || 0, 0, duration);
-    if (state.mode === "synth" && state.synth.playing && state.synth.ctx) {
-      return clamp((performance.now() - state.synth.clockStartedAt) / 1000, 0, duration);
+    if (state.mode === "synth" && state.synth.playing) {
+      return clamp((Date.now() - state.synth.clockStartedAt) / 1000, 0, duration);
     }
     return clamp(Number(state.data.currentTime) || state.synth.offset || 0, 0, duration);
   }
