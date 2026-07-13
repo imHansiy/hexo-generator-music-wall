@@ -1559,7 +1559,8 @@ body.music-wall-page .music-wall-embed {
   display: block;
 }
 
-.music-wall-floating-player.is-collapsed:hover {
+.music-wall-floating-player.is-collapsed:hover,
+.music-wall-floating-player.is-collapsed:focus-within {
   width: min(440px, calc(100vw - 36px));
   border-color: rgba(255, 255, 255, 0.16);
   border-radius: 16px;
@@ -1570,15 +1571,18 @@ body.music-wall-page .music-wall-embed {
   -webkit-backdrop-filter: blur(18px) saturate(125%);
 }
 
-.music-wall-floating-player.is-collapsed:hover::before {
+.music-wall-floating-player.is-collapsed:hover::before,
+.music-wall-floating-player.is-collapsed:focus-within::before {
   display: block;
 }
 
-.music-wall-floating-player.is-collapsed:hover .mw-float-expanded {
+.music-wall-floating-player.is-collapsed:hover .mw-float-expanded,
+.music-wall-floating-player.is-collapsed:focus-within .mw-float-expanded {
   display: grid;
 }
 
-.music-wall-floating-player.is-collapsed:hover .mw-float-collapsed {
+.music-wall-floating-player.is-collapsed:hover .mw-float-collapsed,
+.music-wall-floating-player.is-collapsed:focus-within .mw-float-collapsed {
   display: none;
 }
 

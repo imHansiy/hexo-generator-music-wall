@@ -3,7 +3,6 @@
 
   const STORAGE_NOW_PLAYING = "music-clone:nowPlaying";
   const STORAGE_QUEUE = "music-clone:queue";
-  const STORAGE_COLLAPSED = "music-clone:floatingPlayerCollapsed";
   const STORAGE_FAVORITES = "music-clone:favorites";
   const STORAGE_LOOP = "music-clone:floatingPlayerLoop";
   const STORAGE_POSITION = "music-clone:floatingPlayerPosition";
@@ -23,7 +22,7 @@
     audioUrl: sharedAudio instanceof HTMLMediaElement ? (sharedAudio.currentSrc || sharedAudio.src || "") : "",
     data: readJson(STORAGE_NOW_PLAYING, null),
     queue: normalizeStoredQueue(readJson(STORAGE_QUEUE, [])),
-    collapsed: localStorage.getItem(STORAGE_COLLAPSED) === "1",
+    collapsed: true,
     favorites: readFavoriteSet(),
     loop: localStorage.getItem(STORAGE_LOOP) === "1",
     lyricsEnabled: localStorage.getItem(STORAGE_LYRICS) !== "false",
@@ -118,10 +117,6 @@
   });
 
   window.addEventListener("storage", (event) => {
-    if (event.key === STORAGE_COLLAPSED) {
-      setCollapsed(event.newValue === "1", false);
-      return;
-    }
     if (event.key === STORAGE_FAVORITES) {
       state.favorites = readFavoriteSet();
       syncView();
@@ -358,7 +353,7 @@
           <button class="mw-float-icon mw-float-loop" type="button" data-action="loop" aria-label="单曲循环" title="单曲循环">${icon("repeat")}</button>
           <button class="mw-float-icon mw-float-lyrics-toggle" type="button" data-action="lyrics" aria-label="歌词显示" title="显示或隐藏歌词">${icon("lyrics")}</button>
           <button class="mw-float-icon mw-float-favorite" type="button" data-action="favorite" aria-label="喜欢" title="喜欢">${icon("heart")}</button>
-          <button class="mw-float-icon" type="button" data-action="collapse" aria-label="缩小播放器" title="缩小播放器">${icon("collapse")}</button>
+          <button class="mw-float-icon mw-float-music-wall" type="button" data-action="music" aria-label="进入音乐墙" title="进入音乐墙">${icon("wall")}</button>
         </div>
         <div class="mw-float-progress-row">
           <span class="mw-float-current">0:00</span>
@@ -444,7 +439,16 @@
     if (action === "loop") toggleLoop();
     if (action === "lyrics") toggleLyrics();
     if (action === "favorite") toggleFavorite();
-    if (action === "collapse") setCollapsed(!state.collapsed);
+    if (action === "music") openMusicWall();
+  }
+
+  function openMusicWall() {
+    const link = document.createElement("a");
+    link.href = MUSIC_PATH;
+    link.hidden = true;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   }
 
   function bindAudioEvents() {
@@ -746,13 +750,6 @@
     syncView();
   }
 
-  function setCollapsed(collapsed, save = true) {
-    state.collapsed = collapsed;
-    state.root?.classList.toggle("is-collapsed", collapsed);
-    if (save) localStorage.setItem(STORAGE_COLLAPSED, collapsed ? "1" : "0");
-    syncView();
-  }
-
   function syncAudioSource(force) {
     const url = state.data?.audio || "";
     if (!url || (!force && state.audioUrl === url)) return;
@@ -957,11 +954,6 @@
     state.root.querySelector(".mw-float-loop").classList.toggle("is-active", state.loop);
     state.root.querySelector(".mw-float-lyrics-toggle").classList.toggle("is-active", state.lyricsEnabled);
     state.root.querySelector(".mw-float-favorite").classList.toggle("is-active", state.favorites.has(String(state.data.id || "")));
-
-    const collapseButton = state.root.querySelector("[data-action='collapse']");
-    const collapseLabel = state.collapsed ? "保持展开" : "缩小播放器";
-    collapseButton.setAttribute("aria-label", collapseLabel);
-    collapseButton.setAttribute("title", collapseLabel);
 
     state.root.querySelectorAll(".mw-float-cover").forEach((node) => {
       node.style.backgroundImage = cover ? `url("${cssUrl(cover)}")` : "";
@@ -1175,7 +1167,7 @@
       repeat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 1 4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
       lyrics: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>',
       heart: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>',
-      collapse: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 14 6 6m0-6v6H4M20 10l-6-6m0 6V4h6"/></svg>',
+      wall: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>',
     };
     return icons[type] || icons.play;
   }
