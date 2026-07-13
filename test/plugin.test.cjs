@@ -74,4 +74,5 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(wallApp, /function restorePlaybackFromSharedState\(\)/);
   assert.match(wallApp, /function startFrameLoop\(\)/);
   assert.match(wallApp, /if \(!state\.pageActive \|\| !refs\.app\?\.isConnected\)/);
+  assert.match(wallApp, /rebuildLayout\(\);\s+centerWorld\(\);\s+state\.initializedPosition = true/);
 });

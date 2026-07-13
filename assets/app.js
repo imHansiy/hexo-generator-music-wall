@@ -272,8 +272,9 @@
     measure();
     restorePlaybackFromSharedState();
     rebuildLayout();
+    centerWorld();
+    state.initializedPosition = true;
     if (state.currentTrackId) focusTrackInWall(state.currentTrackId, { immediate: true });
-    else centerWorld();
     state.renderKey = "";
     updateInstances();
     updatePlaybackViews();
