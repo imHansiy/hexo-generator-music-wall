@@ -238,6 +238,7 @@
   window.addEventListener("hexo-music-wall:playback-command", onSharedPlaybackCommand);
   document.addEventListener("pjax:send", onThemePjaxSend);
   document.addEventListener("pjax:complete", onThemePjaxComplete);
+  installMountObserver();
 
   let booted = false;
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
@@ -264,7 +265,12 @@
   }
 
   function onMusicWallNavigated(event) {
-    if (!event.detail?.isMusicPage || !refs.app?.isConnected) return;
+    if (!booted || !event.detail?.isMusicPage || !refs.app?.isConnected) return;
+    activateMusicWall();
+  }
+
+  function activateMusicWall() {
+    if (!refs.app?.isConnected || (state.pageActive && state.raf)) return;
     state.pageActive = true;
     state.pointer.active = false;
     state.pointer.id = null;
@@ -306,6 +312,30 @@
     if (!incomingApp) return;
     if (incomingApp !== refs.app) incomingApp.replaceWith(refs.app);
     onMusicWallNavigated({ detail: { isMusicPage: true } });
+  }
+
+  function installMountObserver() {
+    let queued = false;
+    const observer = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      queueMicrotask(() => {
+        queued = false;
+        reconcileMusicWallMount();
+      });
+    });
+    observer.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  function reconcileMusicWallMount() {
+    const incomingApp = document.querySelector(".music-wall-embed");
+    if (incomingApp && incomingApp !== refs.app && !refs.app.isConnected) incomingApp.replaceWith(refs.app);
+    if (refs.app.isConnected) {
+      if (!booted) return;
+      if (!state.pageActive) activateMusicWall();
+    } else if (state.pageActive) {
+      onMusicWallNavigateBefore();
+    }
   }
 
   function restorePlaybackFromSharedState() {

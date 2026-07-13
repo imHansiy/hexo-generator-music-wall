@@ -75,6 +75,9 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(wallApp, /document\.addEventListener\("pjax:send", onThemePjaxSend\)/);
   assert.match(wallApp, /document\.addEventListener\("pjax:complete", onThemePjaxComplete\)/);
   assert.match(wallApp, /incomingApp !== refs\.app/);
+  assert.match(wallApp, /function installMountObserver\(\)/);
+  assert.match(wallApp, /observer\.observe\(document\.documentElement, \{ childList: true, subtree: true \}\)/);
+  assert.match(wallApp, /function reconcileMusicWallMount\(\)/);
   assert.match(wallApp, /function restorePlaybackFromSharedState\(\)/);
   assert.match(wallApp, /function startFrameLoop\(\)/);
   assert.match(wallApp, /if \(!state\.pageActive \|\| !refs\.app\?\.isConnected\)/);
