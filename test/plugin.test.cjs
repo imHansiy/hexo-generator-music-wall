@@ -70,6 +70,8 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(globalPlayer, /进入音乐墙/);
   assert.doesNotMatch(globalPlayer, /data-action="collapse"/);
   assert.doesNotMatch(globalPlayer, /!link \|\| event\.defaultPrevented/);
+  assert.match(globalPlayer, /window\.addEventListener\("pointerdown"/);
+  assert.match(globalPlayer, /event\.pointerType !== "mouse"/);
   assert.match(wallApp, /hexo-music-wall:playback-command/);
   assert.match(wallApp, /function onMusicWallNavigateBefore\(\)/);
   assert.match(wallApp, /document\.addEventListener\("pjax:send", onThemePjaxSend\)/);
@@ -77,9 +79,14 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(wallApp, /incomingApp !== refs\.app/);
   assert.match(wallApp, /function installMountObserver\(\)/);
   assert.match(wallApp, /observer\.observe\(document\.documentElement, \{ childList: true, subtree: true \}\)/);
+  assert.match(wallApp, /window\.setInterval\(reconcileMusicWallMount, 300\)/);
   assert.match(wallApp, /function reconcileMusicWallMount\(\)/);
+  assert.match(wallApp, /if \(!incomingApp\)/);
+  assert.match(wallApp, /const needsActivation = !state\.mountPresent \|\| replaced \|\| !state\.pageActive/);
   assert.match(wallApp, /function restorePlaybackFromSharedState\(\)/);
   assert.match(wallApp, /function startFrameLoop\(\)/);
   assert.match(wallApp, /if \(!state\.pageActive \|\| !refs\.app\?\.isConnected\)/);
   assert.match(wallApp, /rebuildLayout\(\);\s+centerWorld\(\);\s+state\.initializedPosition = true/);
+  assert.match(wallApp, /focusTrackInWall\(state\.currentTrackId, \{ immediate: true, resetTile: true \}\)/);
+  assert.match(wallApp, /const ix = options\.resetTile \? 0/);
 });

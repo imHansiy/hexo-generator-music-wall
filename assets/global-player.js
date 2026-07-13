@@ -154,6 +154,21 @@
     let navigating = false;
     let activeKey = pageKey(location.href);
 
+    window.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "mouse" || event.button !== 0) return;
+      const link = event.target.closest("a[href]");
+      if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (link.target && link.target !== "_self") return;
+      if (link.hasAttribute("download") || link.getAttribute("rel")?.split(/\s+/).includes("external")) return;
+      const url = new URL(link.href, location.href);
+      if (url.origin !== location.origin || !/^https?:$/.test(url.protocol)) return;
+      if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+      if (pageKey(url.href) === activeKey || !shouldHandleNavigation(url)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      navigate(url, true);
+    }, true);
+
     window.addEventListener("click", (event) => {
       const link = event.target.closest("a[href]");
       if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;

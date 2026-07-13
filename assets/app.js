@@ -207,6 +207,7 @@
     playbackClockOffset: 0,
     performanceLite: false,
     pageActive: true,
+    mountPresent: true,
   };
 
   const audio = {
@@ -282,7 +283,7 @@
     rebuildLayout();
     centerWorld();
     state.initializedPosition = true;
-    if (state.currentTrackId) focusTrackInWall(state.currentTrackId, { immediate: true });
+    if (state.currentTrackId) focusTrackInWall(state.currentTrackId, { immediate: true, resetTile: true });
     state.renderKey = "";
     updateInstances();
     updatePlaybackViews();
@@ -325,17 +326,24 @@
       });
     });
     observer.observe(document.documentElement, { childList: true, subtree: true });
+    window.setInterval(reconcileMusicWallMount, 300);
   }
 
   function reconcileMusicWallMount() {
     const incomingApp = document.querySelector(".music-wall-embed");
-    if (incomingApp && incomingApp !== refs.app && !refs.app.isConnected) incomingApp.replaceWith(refs.app);
-    if (refs.app.isConnected) {
-      if (!booted) return;
-      if (!state.pageActive) activateMusicWall();
-    } else if (state.pageActive) {
-      onMusicWallNavigateBefore();
+    if (!incomingApp) {
+      state.mountPresent = false;
+      if (state.pageActive) onMusicWallNavigateBefore();
+      return;
     }
+    const replaced = incomingApp !== refs.app;
+    const needsActivation = !state.mountPresent || replaced || !state.pageActive;
+    state.mountPresent = true;
+    if (replaced) incomingApp.replaceWith(refs.app);
+    if (!booted) return;
+    if (!needsActivation) return;
+    if (state.pageActive) onMusicWallNavigateBefore();
+    activateMusicWall();
   }
 
   function restorePlaybackFromSharedState() {
@@ -961,8 +969,8 @@
     if (!card) return;
     const centerX = state.size.w / 2;
     const centerY = state.size.h / 2;
-    const ix = Math.round((centerX - state.smooth.x - card.worldX - card.width / 2) / layout.tileW);
-    const iy = Math.round((centerY - state.smooth.y - card.worldY - card.height / 2) / layout.tileH);
+    const ix = options.resetTile ? 0 : Math.round((centerX - state.smooth.x - card.worldX - card.width / 2) / layout.tileW);
+    const iy = options.resetTile ? 0 : Math.round((centerY - state.smooth.y - card.worldY - card.height / 2) / layout.tileH);
     state.target.x = centerX - (card.worldX + ix * layout.tileW + card.width / 2);
     state.target.y = centerY - (card.worldY + iy * layout.tileH + card.height / 2);
     state.velocity.x = 0;
