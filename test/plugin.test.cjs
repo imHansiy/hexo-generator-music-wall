@@ -106,6 +106,10 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(wallApp, /!track \|\| !state\.hasPlaybackStarted/);
   assert.match(wallApp, /!state\.lyricsEnabled \|\| !track \|\| !state\.hasPlaybackStarted/);
   assert.match(globalPlayer, /playbackRuntime\.hasPlaybackStarted = true/);
+  assert.match(globalPlayer, /async function bootGlobalPlayer\(\)/);
+  assert.match(globalPlayer, /!state\.data && !await selectDefaultQueueTrack\(\)/);
+  assert.match(globalPlayer, /async function selectDefaultQueueTrack\(\)/);
+  assert.match(globalPlayer, /const track = state\.queue\[0\]/);
   assert.match(wallApp, /function startFrameLoop\(\)/);
   assert.match(wallApp, /if \(!state\.pageActive \|\| !refs\.app\?\.isConnected\)/);
   assert.match(wallApp, /rebuildLayout\(\);\s+centerWorld\(\);\s+state\.initializedPosition = true/);

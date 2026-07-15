@@ -41,6 +41,7 @@
     controlPress: { action: "", at: 0 },
     musicPageActive: Boolean(document.querySelector(".music-wall-embed")),
     lastTickAt: 0,
+    booting: false,
     root: null,
     lyricsRoot: null,
     drag: {
@@ -74,7 +75,7 @@
     if (!event.detail?.isMusicPage) bootGlobalPlayer();
   });
 
-  function bootGlobalPlayer() {
+  async function bootGlobalPlayer() {
     if (state.root?.isConnected) {
       refreshGlobalPlayerFromSharedAudio();
       state.root.hidden = false;
@@ -82,34 +83,56 @@
       syncView();
       return;
     }
-    state.data = readJson(STORAGE_NOW_PLAYING, null);
-    if (!state.data) return;
-    state.queue = normalizeStoredQueue(readJson(STORAGE_QUEUE, []));
-    const adoptedAudio = window.__HEXO_MUSIC_WALL_SHARED_AUDIO__;
-    if (adoptedAudio instanceof HTMLMediaElement) {
-      state.audio = adoptedAudio;
-      state.audioUrl = adoptedAudio.currentSrc || adoptedAudio.src || "";
-      state.playing = !adoptedAudio.paused && !adoptedAudio.ended;
-      state.mode = state.audioUrl ? "media" : "idle";
-      if (state.playing) state.data.isPlaying = true;
-      if (Number.isFinite(adoptedAudio.currentTime)) state.data.currentTime = adoptedAudio.currentTime;
-    }
+    if (state.booting) return;
+    state.booting = true;
+    try {
+      state.data = readJson(STORAGE_NOW_PLAYING, null);
+      state.queue = normalizeStoredQueue(readJson(STORAGE_QUEUE, []));
+      if (!state.data && !await selectDefaultQueueTrack()) return;
 
-    alignCurrentWithQueue();
-    state.audio.preload = "auto";
-    state.audio.volume = clamp(Number(localStorage.getItem("music-clone:volume") || 0.82), 0, 1);
-    state.audio.loop = state.loop;
-    createPlayer();
-    applySavedPosition();
-    bindAudioEvents();
-    if (!state.audioUrl) syncAudioSource(false);
-    state.status = state.playing ? "" : (state.data.isPlaying ? "点击播放以继续" : "");
-    if (!state.playing) state.data.isPlaying = false;
-    syncView();
-    requestAnimationFrame(tick);
-    hydrateQueue();
-    loadLyrics();
-    window.addEventListener("resize", clampPlayerPosition);
+      const adoptedAudio = window.__HEXO_MUSIC_WALL_SHARED_AUDIO__;
+      if (adoptedAudio instanceof HTMLMediaElement) {
+        state.audio = adoptedAudio;
+        state.audioUrl = adoptedAudio.currentSrc || adoptedAudio.src || "";
+        state.playing = !adoptedAudio.paused && !adoptedAudio.ended;
+        state.mode = state.audioUrl ? "media" : "idle";
+        if (state.playing) state.data.isPlaying = true;
+        if (Number.isFinite(adoptedAudio.currentTime)) state.data.currentTime = adoptedAudio.currentTime;
+      }
+
+      alignCurrentWithQueue();
+      state.audio.preload = "auto";
+      state.audio.volume = clamp(Number(localStorage.getItem("music-clone:volume") || 0.82), 0, 1);
+      state.audio.loop = state.loop;
+      createPlayer();
+      applySavedPosition();
+      bindAudioEvents();
+      if (!state.audioUrl) syncAudioSource(false);
+      state.status = state.playing ? "" : (state.data.isPlaying ? "点击播放以继续" : "");
+      if (!state.playing) state.data.isPlaying = false;
+      syncView();
+      requestAnimationFrame(tick);
+      hydrateQueue();
+      loadLyrics();
+      window.addEventListener("resize", clampPlayerPosition);
+    } finally {
+      state.booting = false;
+    }
+  }
+
+  async function selectDefaultQueueTrack() {
+    if (!state.queue.length) await hydrateQueue();
+    const track = state.queue[0];
+    if (!track) return false;
+    state.data = {
+      ...track,
+      currentTime: 0,
+      duration: Number(track.duration) || SYNTH_DURATION,
+      isPlaying: false,
+      updatedAt: Date.now(),
+    };
+    localStorage.setItem(STORAGE_NOW_PLAYING, JSON.stringify(state.data));
+    return true;
   }
 
   function refreshGlobalPlayerFromSharedAudio() {
