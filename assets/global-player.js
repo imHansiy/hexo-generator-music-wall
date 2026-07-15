@@ -318,7 +318,12 @@
         runPjaxScripts(nextEntry.pjaxScripts);
         window.scrollTo({ top: 0, left: 0, behavior: "instant" });
         const isMusicPage = normalizePath(url.pathname) === MUSIC_PATH;
+        document.documentElement.classList.toggle("music-wall-page", isMusicPage);
         document.body.classList.toggle("music-wall-page", isMusicPage);
+        if (!isMusicPage) {
+          document.documentElement.style.removeProperty("--music-wall-viewport-height");
+          document.body.style.background = "";
+        }
         if (isMusicPage) await ensureMusicWallAssets();
         runNavigationCompleteHooks(url.href);
         window.dispatchEvent(new CustomEvent("hexo-music-wall:navigated", { detail: { url: url.href, isMusicPage } }));

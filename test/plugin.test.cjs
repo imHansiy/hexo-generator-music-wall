@@ -41,7 +41,10 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   const routeMap = new Map(routes.map((route) => [route.path, route]));
 
   assert.match(head, /\/blog\/music\/assets\/player\.css\?v=/);
-  assert.doesNotMatch(head, /styles\.css/);
+  assert.match(head, /data-music-wall-critical/);
+  assert.match(head, /data-music-wall-boot/);
+  assert.match(head, /music-wall-page/);
+  assert.match(head, /styles\.css\?v=/);
   assert.match(body, /"navigationMode":"plugin"/);
   assert.match(body, /"contentSelector":"#content-inner"/);
   assert.match(body, /"assetBase":"\/blog\/music\/assets"/);
@@ -50,6 +53,7 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.ok(routeMap.has("music/assets/app.js"));
   assert.ok(routeMap.has("music/assets/global-player.js"));
   assert.match(routeMap.get("music/index.html").data.content, /music\/assets\/styles\.css\?v=/);
+  assert.match(routeMap.get("music/index.html").data.content, /data-music-wall-styles/);
   assert.match(routeMap.get("music/index.html").data.content, /music\/assets\/app\.js\?v=/);
 
   const wallCss = fs.readFileSync(path.join(__dirname, "..", "assets", "styles.css"), "utf8");
@@ -120,11 +124,15 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(wallApp, /function syncMusicWallViewportLayout\(/);
   assert.match(wallApp, /function scheduleViewportSync\(/);
   assert.match(wallApp, /function installNavResizeObserver\(/);
+  assert.match(wallApp, /function primeMusicWallShell\(/);
+  assert.match(wallApp, /primeMusicWallShell\(\)/);
   assert.match(wallApp, /--music-wall-nav-offset/);
   assert.match(wallApp, /--music-wall-viewport-height/);
   assert.match(wallApp, /visualViewport\.addEventListener\("resize"/);
   assert.match(wallApp, /orientationchange/);
   assert.doesNotMatch(wallApp, /Math\.max\(560, viewportHeight\)/);
+  assert.match(wallApp, /document\.documentElement\.classList\.add\("music-wall-page"\)/);
+  assert.match(globalPlayer, /document\.documentElement\.classList\.toggle\("music-wall-page"/);
   assert.match(wallCss, /body\.music-wall-page footer\.footer/);
   assert.match(wallCss, /body\.music-wall-page\[data-music-wall-theme="volantis"\] #safearea/);
   assert.match(wallCss, /overflow-y:\s*hidden/);

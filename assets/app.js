@@ -251,27 +251,46 @@
   installMountObserver();
 
   let booted = false;
+  // Apply shell layout as soon as the script runs so first paint is fullscreen.
+  primeMusicWallShell();
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot, { once: true });
   else queueMicrotask(boot);
+
+  function primeMusicWallShell() {
+    document.documentElement.classList.add("music-wall-page");
+    if (document.body) document.body.classList.add("music-wall-page");
+    if (refs.app?.isConnected) {
+      prepareThemeCompatibility();
+      syncMusicWallViewportLayout({ force: true });
+    }
+  }
 
   async function boot() {
     if (booted || !refs.app?.isConnected) return;
     booted = true;
+    document.documentElement.classList.add("music-wall-page");
     document.body.classList.add("music-wall-page");
     prepareThemeCompatibility();
+    syncMusicWallViewportLayout({ force: true });
+    measure();
     applyConfiguredCopy();
     applyVisualMode();
     applyDesktopLyricsPosition();
     bindGlobalEvents();
     installStageResizeObserver();
     window.addEventListener("hexo-music-wall:navigated", onMusicWallNavigated);
+    // Paint fullscreen shell first; load playlist data after layout is ready.
+    startFrameLoop();
+    updateEmptyState();
+    updateMiniPlayer();
     if (CONFIG.enableLocalLibrary) await refreshLocalTracks();
     await refreshFeaturedTracks();
-    syncMusicWallViewportLayout({ force: true });
-    measure();
     applySource(state.source, { silent: true });
     initializeTrackSelection();
-    startFrameLoop();
+    syncMusicWallViewportLayout({ force: true });
+    measure();
+    rebuildLayout();
+    updatePlaybackViews();
     updateMiniPlayer();
     updateEmptyState();
     toast(state.featuredFromPlaylist ? "歌单已载入，拖拽卡片开始探索" : "音乐墙已就绪，拖拽卡片开始探索");
@@ -315,6 +334,12 @@
     state.raf = 0;
     if (state.resizeRaf) cancelAnimationFrame(state.resizeRaf);
     state.resizeRaf = 0;
+    if (state.viewportSyncRaf) cancelAnimationFrame(state.viewportSyncRaf);
+    state.viewportSyncRaf = 0;
+    document.documentElement.classList.remove("music-wall-page");
+    document.body.classList.remove("music-wall-page");
+    document.documentElement.style.removeProperty("--music-wall-viewport-height");
+    document.body.style.background = "";
   }
 
   function onThemePjaxSend() {

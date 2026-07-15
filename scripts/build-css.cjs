@@ -92,6 +92,10 @@ function isPlayerSelector(selector) {
 
 function scopeWallSelector(selector) {
   const trimmed = selector.trim();
-  if (trimmed.includes(".music-wall-embed") || trimmed.startsWith("body.music-wall-page")) return trimmed;
+  if (
+    trimmed.includes(".music-wall-embed")
+    || trimmed.startsWith("body.music-wall-page")
+    || trimmed.startsWith("html.music-wall-page")
+  ) return trimmed;
   return `.music-wall-embed ${trimmed}`;
 }

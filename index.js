@@ -39,9 +39,13 @@ if (hexo.extend.injector) {
     const route = normalizeRoute(config.path);
     const assetRoute = route ? `${route}/assets` : "assets";
     const assetBase = joinUrl(hexo.config.root || "/", assetRoute);
+    const musicPath = joinUrl(hexo.config.root || "/", route || DEFAULT_CONFIG.path);
     const assetVersion = getAssetVersion();
     const cacheSuffix = assetVersion ? `?v=${encodeURIComponent(assetVersion)}` : "";
-    return `<link rel="stylesheet" href="${assetBase}/player.css${cacheSuffix}" data-music-wall-player-style>`;
+    return [
+      `<link rel="stylesheet" href="${assetBase}/player.css${cacheSuffix}" data-music-wall-player-style>`,
+      renderFirstPaintHead(musicPath, assetBase, cacheSuffix)
+    ].join("");
   });
 
   hexo.extend.injector.register("body_end", function musicWallBodyInjector() {
@@ -169,12 +173,69 @@ function normalizeNavigationMode(value) {
   return ["auto", "plugin", "native"].includes(mode) ? mode : DEFAULT_CONFIG.navigation_mode;
 }
 
+function renderFirstPaintHead(musicPath, assetBase, cacheSuffix) {
+  const pathJson = JSON.stringify(musicPath || "/music");
+  const stylesHref = `${assetBase}/styles.css${cacheSuffix}`;
+  // Critical shell CSS: paint fullscreen before app.js / full stylesheet arrive.
+  // Activated by html.music-wall-page (set by inline script) or :has(.music-wall-embed).
+  const criticalCss = `
+html.music-wall-page,html.music-wall-page body,body.music-wall-page,body:has(.music-wall-embed){
+  height:100dvh!important;max-height:100dvh!important;overflow:hidden!important;background:#03050a!important;
+}
+html.music-wall-page .article-meta,html.music-wall-page .article-header,html.music-wall-page .post-meta,
+html.music-wall-page #comments,html.music-wall-page footer.footer,html.music-wall-page footer#footer,
+html.music-wall-page #footer,html.music-wall-page .site-footer,html.music-wall-page #s-top,html.music-wall-page #l_cover,
+html.music-wall-page .music-wall-page-sibling,html.music-wall-page .music-wall-page-meta,
+body:has(.music-wall-embed) .article-meta,body:has(.music-wall-embed) .article-header,body:has(.music-wall-embed) .post-meta,
+body:has(.music-wall-embed) #comments,body:has(.music-wall-embed) footer.footer,body:has(.music-wall-embed) footer#footer,
+body:has(.music-wall-embed) #footer,body:has(.music-wall-embed) .site-footer,body:has(.music-wall-embed) #s-top,
+body:has(.music-wall-embed) #l_cover{
+  display:none!important;
+}
+html.music-wall-page #safearea,html.music-wall-page .body-wrapper,html.music-wall-page #l_body,html.music-wall-page #l_main,
+html.music-wall-page article.post,html.music-wall-page #post-body,
+body:has(.music-wall-embed) #safearea,body:has(.music-wall-embed) .body-wrapper,body:has(.music-wall-embed) #l_body,
+body:has(.music-wall-embed) #l_main,body:has(.music-wall-embed) article.post,body:has(.music-wall-embed) #post-body{
+  margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;
+  background:transparent!important;max-width:none!important;width:100%!important;float:none!important;min-height:0!important;
+}
+html.music-wall-page .music-wall-embed,body.music-wall-page .music-wall-embed,body:has(.music-wall-embed) .music-wall-embed{
+  position:fixed!important;top:var(--music-wall-nav-offset,64px)!important;right:0!important;bottom:0!important;left:0!important;
+  z-index:40!important;width:auto!important;max-width:none!important;min-height:0!important;margin:0!important;
+  height:auto!important;background:#03050a!important;overflow:hidden!important;border-radius:0!important;
+}
+`.replace(/\s+/g, " ").trim();
+
+  const bootScript = [
+    "(function(){try{",
+    `var musicPath=${pathJson};`,
+    `var stylesHref=${JSON.stringify(stylesHref)};`,
+    `var appHref=${JSON.stringify(stylesHref.replace(/styles\.css(?:\?.*)?$/, (m) => m.replace("styles.css", "app.js")))};`,
+    "function normalize(p){return String(p||'/').replace(/\\\\/g,'/').replace(/\\/+$/,'')||'/';}",
+    "var current=normalize(location.pathname);",
+    "var target=normalize(musicPath);",
+    "if(current!==target&&current!==target+'/index.html')return;",
+    "var root=document.documentElement;",
+    "root.classList.add('music-wall-page');",
+    "root.style.setProperty('--music-wall-nav-offset','64px');",
+    "root.style.setProperty('--music-wall-viewport-height',(window.visualViewport&&window.visualViewport.height?Math.round(window.visualViewport.height):window.innerHeight)+'px');",
+    "if(document.body)document.body.classList.add('music-wall-page');",
+    "else document.addEventListener('DOMContentLoaded',function(){document.body&&document.body.classList.add('music-wall-page');},{once:true});",
+    "if(!document.querySelector('link[data-music-wall-styles]')){var link=document.createElement('link');link.rel='stylesheet';link.href=stylesHref;link.setAttribute('data-music-wall-styles','');document.head.appendChild(link);}",
+    "var preload=document.createElement('link');preload.rel='preload';preload.as='style';preload.href=stylesHref;document.head.appendChild(preload);",
+    "var preApp=document.createElement('link');preApp.rel='preload';preApp.as='script';preApp.href=appHref;document.head.appendChild(preApp);",
+    "}catch(e){}})();"
+  ].join("");
+
+  return `<style data-music-wall-critical>${criticalCss}</style><script data-music-wall-boot>${bootScript}</script>`;
+}
+
 function renderComponent(config, assetBase, assetVersion) {
   const title = escapeHtml(config.title || DEFAULT_CONFIG.title);
   const subtitle = escapeHtml(config.subtitle || DEFAULT_CONFIG.subtitle);
   const json = JSON.stringify(config).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
   const cacheSuffix = assetVersion ? `?v=${encodeURIComponent(assetVersion)}` : "";
-  return `<link rel="stylesheet" href="${assetBase}/styles.css${cacheSuffix}" />
+  return `<link rel="stylesheet" href="${assetBase}/styles.css${cacheSuffix}" data-music-wall-styles />
     <div id="app" class="music-wall-embed" aria-label="${title}">
       <div class="music-wall-status" id="statusLine" aria-live="polite">${subtitle}</div>
       <main id="stage" class="stage" aria-label="音乐墙">
