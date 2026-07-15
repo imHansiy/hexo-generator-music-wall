@@ -12,9 +12,14 @@
 }
 
 body.music-wall-page {
-  overflow-x: clip;
-  /* Wall is viewport-tall; prevent theme footer from creating a scrollable blank zone. */
-  overflow-y: hidden;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  overflow-x: clip !important;
+  overflow-y: hidden !important;
+  /* Match wall canvas so leftover theme chrome never flashes as a light strip. */
+  background: #03050a !important;
 }
 
 body.music-wall-page .music-wall-host {
@@ -31,6 +36,7 @@ body.music-wall-page .music-wall-host {
   background: transparent !important;
   box-shadow: none !important;
   overflow: visible !important;
+  min-height: 0 !important;
 }
 
 body.music-wall-page .music-wall-host.article,
@@ -56,21 +62,20 @@ body.music-wall-page #s-top {
 
 /* Volantis: collapse content chrome so the wall sits flush under the nav. */
 
-body.music-wall-page[data-music-wall-theme="volantis"] #safearea {
+body.music-wall-page[data-music-wall-theme="volantis"] #safearea,
+body.music-wall-page[data-music-wall-theme="volantis"] .body-wrapper,
+body.music-wall-page[data-music-wall-theme="volantis"] #l_body,
+body.music-wall-page[data-music-wall-theme="volantis"] #l_cover {
   margin: 0 !important;
   padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  background: transparent !important;
 }
 
-body.music-wall-page[data-music-wall-theme="volantis"] .body-wrapper {
-  margin: 0 !important;
-  padding: 0 !important;
-  max-width: none !important;
-  width: 100% !important;
-}
-
-body.music-wall-page[data-music-wall-theme="volantis"] #l_body {
-  margin: 0 !important;
-  padding: 0 !important;
+body.music-wall-page[data-music-wall-theme="volantis"] #l_cover,
+body.music-wall-page[data-music-wall-theme="volantis"] #l_cover .cover-wrapper {
+  display: none !important;
 }
 
 body.music-wall-page[data-music-wall-theme="volantis"] #l_main.music-wall-host {
@@ -108,13 +113,22 @@ body.music-wall-page[data-music-wall-theme="butterfly"] #page-header #page-site-
   display: none !important;
 }
 
+/* Pin the wall to the remaining viewport under the theme nav. */
+
 body.music-wall-page .music-wall-embed {
-  left: 50%;
-  width: 100vw;
-  width: 100dvw;
-  max-width: none;
-  margin-left: -50vw;
-  margin-left: -50dvw;
+  position: fixed !important;
+  top: var(--music-wall-nav-offset, 64px) !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  z-index: 40;
+  width: 100vw !important;
+  width: 100dvw !important;
+  max-width: none !important;
+  height: calc(100vh - var(--music-wall-nav-offset, 64px)) !important;
+  height: calc(100dvh - var(--music-wall-nav-offset, 64px)) !important;
+  min-height: 0 !important;
+  margin: 0 !important;
 }
 
 .music-wall-embed,
@@ -153,9 +167,9 @@ body.music-wall-page .music-wall-embed {
 .music-wall-embed {
   position: relative;
   width: 100%;
-  height: calc(100vh - 60px);
-  height: calc(100dvh - 60px);
-  min-height: 560px;
+  height: calc(100vh - var(--music-wall-nav-offset, 64px));
+  height: calc(100dvh - var(--music-wall-nav-offset, 64px));
+  min-height: 0;
   overflow: hidden;
   border-radius: 0;
   color: #fff;

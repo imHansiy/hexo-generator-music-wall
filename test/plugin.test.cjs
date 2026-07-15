@@ -117,7 +117,12 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(wallApp, /const ix = options\.resetTile \? 0/);
   assert.match(wallApp, /footer\.footer, footer#footer, #footer, \.site-footer, #s-top/);
   assert.doesNotMatch(wallApp, /sibling\.matches\("script, style, link, header, nav, footer"\)/);
+  assert.match(wallApp, /function syncMusicWallNavOffset\(\)/);
+  assert.match(wallApp, /--music-wall-nav-offset/);
   assert.match(wallCss, /body\.music-wall-page footer\.footer/);
   assert.match(wallCss, /body\.music-wall-page\[data-music-wall-theme="volantis"\] #safearea/);
   assert.match(wallCss, /overflow-y:\s*hidden/);
+  assert.match(wallCss, /position:\s*fixed\s*!important/);
+  assert.match(wallCss, /--music-wall-nav-offset/);
+  assert.match(wallCss, /background:\s*#03050a\s*!important/);
 });

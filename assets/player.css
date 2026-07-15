@@ -6,6 +6,8 @@
 
 /* Butterfly also places its navigation inside a page hero. */
 
+/* Pin the wall to the remaining viewport under the theme nav. */
+
 .music-wall-floating-player {
   position: fixed;
   z-index: 2000;

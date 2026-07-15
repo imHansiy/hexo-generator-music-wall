@@ -1,6 +1,6 @@
 {
   "name": "hexo-generator-music-wall",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "description": "Hexo 网易云音乐墙插件，生成沉浸式 3D 歌单页面。",
   "main": "index.js",
   "scripts": {

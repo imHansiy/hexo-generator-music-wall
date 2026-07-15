@@ -285,6 +285,7 @@
     state.velocity.x = 0;
     state.velocity.y = 0;
     prepareThemeCompatibility();
+    syncMusicWallNavOffset();
     measure();
     rebuildLayout();
     centerWorld();
@@ -348,7 +349,9 @@
     if (Math.abs(nextSize.w - state.size.w) < 2 && Math.abs(nextSize.h - state.size.h) < 2) return;
     state.resizeRaf = requestAnimationFrame(() => {
       state.resizeRaf = 0;
-      if (!state.pageActive || !refs.app?.isConnected || !measure()) return;
+      if (!state.pageActive || !refs.app?.isConnected) return;
+      syncMusicWallNavOffset();
+      if (!measure()) return;
       rebuildLayout();
       if (state.currentTrackId) focusTrackInWall(state.currentTrackId, { immediate: true, resetTile: true });
       state.renderKey = "";
@@ -469,6 +472,7 @@
     document.querySelectorAll("footer.footer, footer#footer, #footer, .site-footer, #s-top").forEach((meta) => {
       meta.classList.add("music-wall-page-meta");
     });
+    syncMusicWallNavOffset();
   }
 
   function detectTheme() {
@@ -478,6 +482,33 @@
     if (document.querySelector(".main-inner") && document.querySelector("main#main")) return "next";
     if (document.querySelector("#board") && document.querySelector("#navbar")) return "fluid";
     return "generic";
+  }
+
+  function resolveThemeNavElement() {
+    const theme = document.body.dataset.musicWallTheme || detectTheme();
+    if (theme === "volantis") {
+      return document.querySelector("#l_header .l_header, #l_header, .l_header, header");
+    }
+    if (theme === "butterfly") return document.querySelector("#nav, #page-header");
+    if (theme === "landscape") return document.querySelector("#header");
+    if (theme === "next") return document.querySelector(".header, #header, header");
+    if (theme === "fluid") return document.querySelector("#navbar, .navbar, header");
+    return document.querySelector("#l_header, #nav, #header, #navbar, .l_header, header, nav");
+  }
+
+  function syncMusicWallNavOffset() {
+    const nav = resolveThemeNavElement();
+    let offset = 64;
+    if (nav) {
+      const rect = nav.getBoundingClientRect();
+      const styles = window.getComputedStyle(nav);
+      const fixedLike = styles.position === "fixed" || styles.position === "sticky";
+      if (fixedLike) offset = Math.max(0, Math.round(rect.bottom));
+      else offset = Math.max(0, Math.round(rect.height || parseFloat(styles.height) || 64));
+    }
+    // Avoid a near-zero offset when nav is temporarily transformed off-screen.
+    if (offset < 40) offset = 64;
+    document.documentElement.style.setProperty("--music-wall-nav-offset", `${offset}px`);
   }
 
   function applyConfiguredCopy() {
