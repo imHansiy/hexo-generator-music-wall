@@ -196,7 +196,11 @@
     seekDraft: null,
     raf: 0,
     resizeRaf: 0,
+    viewportSyncRaf: 0,
     stageResizeObserver: null,
+    navResizeObserver: null,
+    lastNavOffset: 64,
+    lastViewportHeight: 0,
     renderKey: "",
     lastFrame: now(),
     lastRenderedCount: 0,
@@ -263,6 +267,7 @@
     window.addEventListener("hexo-music-wall:navigated", onMusicWallNavigated);
     if (CONFIG.enableLocalLibrary) await refreshLocalTracks();
     await refreshFeaturedTracks();
+    syncMusicWallViewportLayout({ force: true });
     measure();
     applySource(state.source, { silent: true });
     initializeTrackSelection();
@@ -285,7 +290,7 @@
     state.velocity.x = 0;
     state.velocity.y = 0;
     prepareThemeCompatibility();
-    syncMusicWallNavOffset();
+    syncMusicWallViewportLayout({ force: true });
     measure();
     rebuildLayout();
     centerWorld();
@@ -344,14 +349,15 @@
 
   function scheduleStageResize() {
     if (!state.pageActive || !refs.app?.isConnected || state.resizeRaf) return;
-    const nextSize = readStageSize();
-    if (!nextSize) return;
-    if (Math.abs(nextSize.w - state.size.w) < 2 && Math.abs(nextSize.h - state.size.h) < 2) return;
+    const prevW = state.size.w;
+    const prevH = state.size.h;
     state.resizeRaf = requestAnimationFrame(() => {
       state.resizeRaf = 0;
       if (!state.pageActive || !refs.app?.isConnected) return;
-      syncMusicWallNavOffset();
-      if (!measure()) return;
+      const layoutChanged = syncMusicWallViewportLayout();
+      const measured = measure();
+      if (!layoutChanged && !measured) return;
+      if (!layoutChanged && Math.abs(state.size.w - prevW) < 2 && Math.abs(state.size.h - prevH) < 2) return;
       rebuildLayout();
       if (state.currentTrackId) focusTrackInWall(state.currentTrackId, { immediate: true, resetTile: true });
       state.renderKey = "";
@@ -472,7 +478,8 @@
     document.querySelectorAll("footer.footer, footer#footer, #footer, .site-footer, #s-top").forEach((meta) => {
       meta.classList.add("music-wall-page-meta");
     });
-    syncMusicWallNavOffset();
+    installNavResizeObserver();
+    syncMusicWallViewportLayout({ force: true });
   }
 
   function detectTheme() {
@@ -487,7 +494,7 @@
   function resolveThemeNavElement() {
     const theme = document.body.dataset.musicWallTheme || detectTheme();
     if (theme === "volantis") {
-      return document.querySelector("#l_header .l_header, #l_header, .l_header, header");
+      return document.querySelector("#l_header .wrapper, #l_header .l_header, #l_header, .l_header");
     }
     if (theme === "butterfly") return document.querySelector("#nav, #page-header");
     if (theme === "landscape") return document.querySelector("#header");
@@ -496,19 +503,78 @@
     return document.querySelector("#l_header, #nav, #header, #navbar, .l_header, header, nav");
   }
 
-  function syncMusicWallNavOffset() {
+  function readViewportMetrics() {
+    const vv = window.visualViewport;
+    const width = Math.max(1, Math.round(vv?.width || window.innerWidth || document.documentElement.clientWidth || 1));
+    // Prefer visualViewport height (mobile URL bar), then layout viewport.
+    const height = Math.max(1, Math.round(vv?.height || window.innerHeight || document.documentElement.clientHeight || 1));
+    return { width, height };
+  }
+
+  function measureThemeNavOffset() {
     const nav = resolveThemeNavElement();
-    let offset = 64;
-    if (nav) {
-      const rect = nav.getBoundingClientRect();
-      const styles = window.getComputedStyle(nav);
-      const fixedLike = styles.position === "fixed" || styles.position === "sticky";
-      if (fixedLike) offset = Math.max(0, Math.round(rect.bottom));
-      else offset = Math.max(0, Math.round(rect.height || parseFloat(styles.height) || 64));
+    let offset = state.lastNavOffset || 64;
+    if (!nav) return clamp(offset, 40, 160);
+
+    const rect = nav.getBoundingClientRect();
+    const styles = window.getComputedStyle(nav);
+    const fixedLike = styles.position === "fixed" || styles.position === "sticky";
+    const visible = styles.display !== "none" && styles.visibility !== "hidden" && Number(styles.opacity || "1") > 0.01;
+    if (!visible) return clamp(offset, 40, 160);
+
+    if (fixedLike) {
+      // bottom can go negative when nav is slide-hidden; ignore that case.
+      if (rect.bottom > 8 && rect.height > 8) offset = Math.round(rect.bottom);
+      else if (rect.height > 8) offset = Math.round(rect.height);
+    } else if (rect.height > 8) {
+      offset = Math.round(rect.height);
+    } else {
+      const parsed = parseFloat(styles.height);
+      if (Number.isFinite(parsed) && parsed > 8) offset = Math.round(parsed);
     }
-    // Avoid a near-zero offset when nav is temporarily transformed off-screen.
-    if (offset < 40) offset = 64;
-    document.documentElement.style.setProperty("--music-wall-nav-offset", `${offset}px`);
+    return clamp(offset, 40, 160);
+  }
+
+  function syncMusicWallViewportLayout(options = {}) {
+    const force = Boolean(options.force);
+    const viewport = readViewportMetrics();
+    const offset = measureThemeNavOffset();
+    const heightChanged = Math.abs(viewport.height - (state.lastViewportHeight || 0)) >= 1;
+    const offsetChanged = Math.abs(offset - (state.lastNavOffset || 0)) >= 1;
+    if (!force && !heightChanged && !offsetChanged) return false;
+
+    state.lastViewportHeight = viewport.height;
+    state.lastNavOffset = offset;
+    const root = document.documentElement;
+    root.style.setProperty("--music-wall-nav-offset", `${offset}px`);
+    root.style.setProperty("--music-wall-viewport-height", `${viewport.height}px`);
+    // Keep body/html from showing theme light bg under mobile browser chrome.
+    if (document.body.classList.contains("music-wall-page")) {
+      document.body.style.background = "#03050a";
+    }
+    return true;
+  }
+
+  function scheduleViewportSync() {
+    if (!state.pageActive || state.viewportSyncRaf) return;
+    state.viewportSyncRaf = requestAnimationFrame(() => {
+      state.viewportSyncRaf = 0;
+      if (!state.pageActive || !refs.app?.isConnected) return;
+      if (!syncMusicWallViewportLayout()) return;
+      scheduleStageResize();
+    });
+  }
+
+  function installNavResizeObserver() {
+    if (!window.ResizeObserver) return;
+    const nav = resolveThemeNavElement();
+    if (!nav) return;
+    if (state.navResizeObserver) {
+      state.navResizeObserver.disconnect();
+    } else {
+      state.navResizeObserver = new ResizeObserver(() => scheduleViewportSync());
+    }
+    state.navResizeObserver.observe(nav);
   }
 
   function applyConfiguredCopy() {
@@ -792,10 +858,24 @@
   function bindGlobalEvents() {
     window.addEventListener("resize", () => {
       if (!state.pageActive) return;
-      measure();
-      rebuildLayout();
-      state.mouseDirty = true;
+      scheduleViewportSync();
     });
+    window.addEventListener("orientationchange", () => {
+      if (!state.pageActive) return;
+      // orientationchange often fires before layout settles.
+      window.setTimeout(() => scheduleViewportSync(), 50);
+      window.setTimeout(() => scheduleViewportSync(), 250);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", () => {
+        if (!state.pageActive) return;
+        scheduleViewportSync();
+      });
+      window.visualViewport.addEventListener("scroll", () => {
+        if (!state.pageActive) return;
+        scheduleViewportSync();
+      });
+    }
 
     refs.stage.addEventListener("pointerdown", onStagePointerDown);
     refs.stage.addEventListener("wheel", onWheel, { passive: false });
@@ -916,13 +996,17 @@
   }
 
   function readStageSize() {
+    if (!refs.stage) return null;
     const rect = refs.stage.getBoundingClientRect();
-    if (rect.width < 2 || rect.height < 2) return null;
-    const viewportWidth = Math.max(320, window.visualViewport?.width || window.innerWidth || rect.width);
-    const viewportHeight = Math.max(320, window.visualViewport?.height || window.innerHeight || rect.height);
+    const viewport = readViewportMetrics();
+    // Prefer actual stage box after fixed layout; fall back to viewport remainder.
+    const fallbackH = Math.max(120, viewport.height - (state.lastNavOffset || 64));
+    const w = rect.width >= 2 ? rect.width : viewport.width;
+    const h = rect.height >= 2 ? rect.height : fallbackH;
+    if (w < 2 || h < 2) return null;
     return {
-      w: Math.min(rect.width, viewportWidth),
-      h: Math.min(rect.height, Math.max(560, viewportHeight)),
+      w: Math.max(120, Math.min(w, viewport.width || w)),
+      h: Math.max(120, Math.min(h, fallbackH || h)),
     };
   }
 
