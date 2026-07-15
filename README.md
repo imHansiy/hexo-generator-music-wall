@@ -10,6 +10,11 @@
 
 ![Hexo 网易云音乐墙插件界面预览](docs/images/music-wall-preview.jpg)
 
+## 在线体验
+
+- [音乐墙实际效果](https://hansiy.net/music/)
+- [完整安装与配置教程](https://hansiy.net/p/45eac4ee/)
+
 ## 安装
 
 在 Hexo 站点目录中安装：
