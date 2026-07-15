@@ -16,6 +16,8 @@
   const ASSET_BASE = String(CONFIG.assetBase || `${MUSIC_PATH}assets`).replace(/\/+$/, "");
   const ASSET_SUFFIX = CONFIG.assetVersion ? `?v=${encodeURIComponent(CONFIG.assetVersion)}` : "";
   const sharedAudio = window.__HEXO_MUSIC_WALL_SHARED_AUDIO__;
+  const playbackRuntime = window.__HEXO_MUSIC_WALL_PLAYBACK_RUNTIME__ || { hasPlaybackStarted: false };
+  window.__HEXO_MUSIC_WALL_PLAYBACK_RUNTIME__ = playbackRuntime;
 
   const state = {
     audio: sharedAudio instanceof HTMLMediaElement ? sharedAudio : new Audio(),
@@ -686,6 +688,7 @@
   }
 
   async function startPlayback(allowFallback) {
+    playbackRuntime.hasPlaybackStarted = true;
     const requestId = ++state.requestId;
     dispatchPlaybackCommand("play");
     state.loading = true;

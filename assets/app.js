@@ -33,6 +33,8 @@
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
   const now = () => performance.now();
   const CONFIG = normalizeConfig(window.__HEXO_MUSIC_WALL_CONFIG__ || {});
+  const playbackRuntime = window.__HEXO_MUSIC_WALL_PLAYBACK_RUNTIME__ || { hasPlaybackStarted: false };
+  window.__HEXO_MUSIC_WALL_PLAYBACK_RUNTIME__ = playbackRuntime;
 
   const refs = {
     app: $("#app"),
@@ -188,6 +190,7 @@
     isPlaying: false,
     currentTime: 0,
     duration: SYNTH_DURATION,
+    hasPlaybackStarted: false,
     focusActive: false,
     expandedTrackId: null,
     seekDraft: null,
@@ -262,6 +265,7 @@
     await refreshFeaturedTracks();
     measure();
     applySource(state.source, { silent: true });
+    initializeTrackSelection();
     startFrameLoop();
     updateMiniPlayer();
     updateEmptyState();
@@ -282,11 +286,10 @@
     state.velocity.y = 0;
     prepareThemeCompatibility();
     measure();
-    restorePlaybackFromSharedState();
     rebuildLayout();
     centerWorld();
     state.initializedPosition = true;
-    if (state.currentTrackId) focusTrackInWall(state.currentTrackId, { immediate: true, resetTile: true });
+    initializeTrackSelection();
     state.renderKey = "";
     updateInstances();
     updatePlaybackViews();
@@ -371,9 +374,29 @@
     activateMusicWall();
   }
 
+  function initializeTrackSelection() {
+    if (playbackRuntime.hasPlaybackStarted && restorePlaybackFromSharedState()) {
+      focusTrackInWall(state.currentTrackId, { immediate: true, resetTile: true });
+      return;
+    }
+    selectDefaultTrack();
+  }
+
+  function selectDefaultTrack() {
+    const track = state.tracks[0];
+    state.currentTrackId = track?.id || null;
+    state.currentTime = 0;
+    state.duration = track?.duration || SYNTH_DURATION;
+    state.isPlaying = false;
+    state.hasPlaybackStarted = false;
+    state.focusActive = Boolean(track);
+    stopPlaybackClock(0);
+    if (track) focusTrackInWall(track.id, { immediate: true, resetTile: true });
+  }
+
   function restorePlaybackFromSharedState() {
     const saved = readJson(STORAGE.nowPlaying, null);
-    if (!saved) return;
+    if (!saved) return false;
     const candidates = [
       ...state.tracks,
       ...Object.values(state.playlistTracks).flat(),
@@ -382,7 +405,7 @@
     ];
     const track = candidates.find((item) => String(item.id) === String(saved.id))
       || candidates.find((item) => item.title === saved.title && item.artist === saved.artist);
-    if (!track) return;
+    if (!track) return false;
     state.currentTrackId = track.id;
     audio.localTrackId = track.id;
     state.currentTime = Number.isFinite(audio.localEl.currentTime)
@@ -390,11 +413,13 @@
       : Number(saved.currentTime) || 0;
     state.duration = mediaDuration(track) || Number(saved.duration) || SYNTH_DURATION;
     state.isPlaying = !audio.localEl.paused && !audio.localEl.ended;
+    state.hasPlaybackStarted = true;
     state.focusActive = true;
     if (state.isPlaying) startPlaybackClock(state.currentTime);
     else stopPlaybackClock(state.currentTime);
     syncExpandedToTrack(track);
     if (state.lyricsEnabled) ensureTrackLyrics(track);
+    return true;
   }
 
   function startFrameLoop() {
@@ -1525,6 +1550,8 @@
     state.currentTime = 0;
     state.duration = usesMediaElement(track) ? mediaDuration(track) : SYNTH_DURATION;
     state.isPlaying = true;
+    state.hasPlaybackStarted = true;
+    playbackRuntime.hasPlaybackStarted = true;
     state.focusActive = true;
     startPlaybackClock(0);
     pushHistory(track.id);
@@ -1554,6 +1581,10 @@
     }
     const track = findTrack(trackId);
     if (!track) return;
+    if (!state.hasPlaybackStarted) {
+      playTrack(trackId);
+      return;
+    }
     if (state.currentTrackId !== trackId) {
       playTrack(trackId);
       return;
@@ -2044,6 +2075,7 @@
   }
 
   function persistNowPlaying(force) {
+    if (!state.hasPlaybackStarted) return;
     const track = findTrack(state.currentTrackId);
     if (!track) return;
     const time = now();
@@ -2075,7 +2107,7 @@
     const duration = state.duration || 0;
     const progress = duration > 0 ? clamp((state.currentTime || 0) / duration, 0, 1) : 0;
     const current = clamp(state.currentTime || 0, 0, duration || SYNTH_DURATION);
-    refs.miniPlayer?.classList.toggle("is-empty", !track);
+    refs.miniPlayer?.classList.toggle("is-empty", !track || !state.hasPlaybackStarted);
     refs.miniTitle.textContent = track ? track.title : "还没有播放";
     refs.miniArtist.textContent = track ? track.artist || "未知艺术家" : "选择一张音乐卡片";
     refs.miniCover.style.setProperty("--mini-hue", track ? track.hue : 120);
@@ -2217,7 +2249,7 @@
     const root = refs.desktopLyrics;
     if (!root) return;
     const track = findTrack(state.currentTrackId);
-    if (!state.lyricsEnabled || !track) {
+    if (!state.lyricsEnabled || !track || !state.hasPlaybackStarted) {
       root.classList.add("hidden");
       return;
     }

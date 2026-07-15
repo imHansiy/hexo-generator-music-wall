@@ -99,6 +99,13 @@ test("生成主题隔离的音乐页与全局播放器资源", () => {
   assert.match(wallApp, /if \(!incomingApp\)/);
   assert.match(wallApp, /const needsActivation = !state\.mountPresent \|\| replaced \|\| !state\.pageActive/);
   assert.match(wallApp, /function restorePlaybackFromSharedState\(\)/);
+  assert.match(wallApp, /function initializeTrackSelection\(\)/);
+  assert.match(wallApp, /function selectDefaultTrack\(\)/);
+  assert.match(wallApp, /const track = state\.tracks\[0\]/);
+  assert.match(wallApp, /state\.hasPlaybackStarted = false/);
+  assert.match(wallApp, /!track \|\| !state\.hasPlaybackStarted/);
+  assert.match(wallApp, /!state\.lyricsEnabled \|\| !track \|\| !state\.hasPlaybackStarted/);
+  assert.match(globalPlayer, /playbackRuntime\.hasPlaybackStarted = true/);
   assert.match(wallApp, /function startFrameLoop\(\)/);
   assert.match(wallApp, /if \(!state\.pageActive \|\| !refs\.app\?\.isConnected\)/);
   assert.match(wallApp, /rebuildLayout\(\);\s+centerWorld\(\);\s+state\.initializedPosition = true/);
