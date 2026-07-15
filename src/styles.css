@@ -13,6 +13,8 @@
 
 body.music-wall-page {
   overflow-x: clip;
+  /* Wall is viewport-tall; prevent theme footer from creating a scrollable blank zone. */
+  overflow-y: hidden;
 }
 
 body.music-wall-page .music-wall-host {
@@ -24,6 +26,8 @@ body.music-wall-page .music-wall-host {
   border-radius: 0 !important;
   padding-right: 0 !important;
   padding-left: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   overflow: visible !important;
@@ -37,6 +41,42 @@ body.music-wall-page article.music-wall-host {
 body.music-wall-page .music-wall-page-sibling,
 body.music-wall-page .music-wall-page-meta {
   display: none !important;
+}
+
+/* Site footers live outside the replaced main shell and are skipped by sibling hiding. */
+body.music-wall-page footer.footer,
+body.music-wall-page footer#footer,
+body.music-wall-page #footer,
+body.music-wall-page .site-footer,
+body.music-wall-page .footer-inner,
+body.music-wall-page #s-top {
+  display: none !important;
+}
+
+/* Volantis: collapse content chrome so the wall sits flush under the nav. */
+body.music-wall-page[data-music-wall-theme="volantis"] #safearea {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.music-wall-page[data-music-wall-theme="volantis"] .body-wrapper {
+  margin: 0 !important;
+  padding: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+}
+
+body.music-wall-page[data-music-wall-theme="volantis"] #l_body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.music-wall-page[data-music-wall-theme="volantis"] #l_main.music-wall-host {
+  width: 100% !important;
+  max-width: none !important;
+  float: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 /* Landscape keeps its navigation and collapses only the banner portion. */

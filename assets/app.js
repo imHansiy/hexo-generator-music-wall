@@ -455,7 +455,7 @@
       node.classList.add("music-wall-host");
       if (node.parentElement !== document.body) {
         for (const sibling of node.parentElement?.children || []) {
-          if (sibling === node || sibling.matches("script, style, link, header, nav, footer")) continue;
+          if (sibling === node || sibling.matches("script, style, link, header, nav")) continue;
           sibling.classList.add("music-wall-page-sibling");
         }
       }
@@ -464,6 +464,10 @@
 
     document.querySelectorAll(".article-meta, .article-header, .article-footer, .post-meta, .post-header, .post-footer").forEach((meta) => {
       if (meta.closest(".music-wall-host")) meta.classList.add("music-wall-page-meta");
+    });
+    // Theme site footers sit outside the replaced content shell; hide them on the music page.
+    document.querySelectorAll("footer.footer, footer#footer, #footer, .site-footer, #s-top").forEach((meta) => {
+      meta.classList.add("music-wall-page-meta");
     });
   }
 
