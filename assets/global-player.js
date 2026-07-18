@@ -1001,11 +1001,12 @@
 
   function currentPlaybackTime() {
     const duration = getDuration();
-    if (state.mode === "media") return clamp(state.audio.currentTime || state.data.currentTime || 0, 0, duration);
+    // 歌单接口回退期间播放器可能尚未接管媒体元素，歌词计时应先使用已保存进度。
+    if (state.mode === "media") return clamp(state.audio?.currentTime || state.data?.currentTime || 0, 0, duration);
     if (state.mode === "synth" && state.synth.playing) {
       return clamp((Date.now() - state.synth.clockStartedAt) / 1000, 0, duration);
     }
-    return clamp(Number(state.data.currentTime) || state.synth.offset || 0, 0, duration);
+    return clamp(Number(state.data?.currentTime) || state.synth.offset || 0, 0, duration);
   }
 
   async function loadLyrics() {
