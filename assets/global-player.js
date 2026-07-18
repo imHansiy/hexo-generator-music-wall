@@ -101,13 +101,14 @@
       }
 
       alignCurrentWithQueue();
-      state.audio.preload = "auto";
+      // 博客正文页只展示播放器外壳；在访客主动点击播放前不下载整首音频，
+      // 避免音乐资源与首屏图片争抢带宽并拖慢 LCP。
+      state.audio.preload = "none";
       state.audio.volume = clamp(Number(localStorage.getItem("music-clone:volume") || 0.82), 0, 1);
       state.audio.loop = state.loop;
       createPlayer();
       applySavedPosition();
       bindAudioEvents();
-      if (!state.audioUrl) syncAudioSource(false);
       state.status = state.playing ? "" : (state.data.isPlaying ? "点击播放以继续" : "");
       if (!state.playing) state.data.isPlaying = false;
       syncView();
@@ -1174,7 +1175,9 @@
         alignCurrentWithQueue();
         loadLyrics();
         state.status = "";
-        syncAudioSource(true);
+        // 刷新歌单只更新元数据；已经开始播放时才切换媒体源，防止普通
+        // 页面访问因后台歌单水合而触发数 MB 的音频下载。
+        if (playbackRuntime.hasPlaybackStarted || state.playing) syncAudioSource(true);
         syncView();
         return queue;
       } catch (_) {}
